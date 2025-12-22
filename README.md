@@ -124,11 +124,11 @@ The milestones below reflect the intended progression of LOCUS.
 They are feature and understanding-driven, not time-based.
 
 ### Initial Environment and Build Setup
-- [ ] Create initial Makefile
-- [ ] Create Dockerfile with toolchains
-- [ ] Integrate with VS Code Dev Containers extension
-- [ ] Create simple test program(s)
-- [ ] Implement logging functionality
+- [X] Create initial Makefile
+- [X] Create Dockerfile with toolchains
+- [X] Integrate with VS Code Dev Containers extension
+- [X] Create simple test program(s)
+- [X] Implement logging functionality
 
 ### Core ELF Parsing & Validation
 - [ ] Open and validate ELF files
