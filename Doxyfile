@@ -1,0 +1,67 @@
+# --- Project identity ---
+PROJECT_NAME           = "locus"
+PROJECT_BRIEF          = "Loader Of Compiled Universal Systems"
+OUTPUT_DIRECTORY       = docs
+
+# --- Inputs (repo layout) ---
+# Primary code: locus/
+INPUT                  = locus
+RECURSIVE              = YES
+FILE_PATTERNS          = *.c *.h
+
+# If you decide later that you want tests documented too, change INPUT to:
+# INPUT                = locus tests
+
+# --- Extraction policy ---
+# Only document things that are actually documented with Doxygen comments.
+# This keeps output clean and encourages real docs.
+EXTRACT_ALL            = NO
+
+# Document "static" functions? Usually NO (keeps internal helpers out).
+EXTRACT_STATIC         = NO
+
+# Show "private" stuff? For C this mostly maps to undocumented/internal.
+EXTRACT_PRIVATE        = NO
+
+# If you want your macros (TRACE/INFO/etc) documented:
+MACRO_EXPANSION        = YES
+EXPAND_ONLY_PREDEF     = NO
+
+# --- Warnings / correctness (useful for discipline) ---
+WARN_IF_UNDOCUMENTED   = YES
+WARN_NO_PARAMDOC       = YES
+WARN_AS_ERROR          = NO
+
+# --- Output formats ---
+GENERATE_HTML          = YES
+HTML_OUTPUT            = html
+
+GENERATE_LATEX         = NO
+GENERATE_MAN           = NO
+GENERATE_RTF           = NO
+GENERATE_XML           = NO
+
+# --- Graphs (Graphviz) ---
+# You installed graphviz; keep graphs modest to avoid clutter.
+HAVE_DOT               = YES
+DOT_NUM_THREADS        = 0
+CALL_GRAPH             = YES
+CALLER_GRAPH           = NO
+UML_LOOK               = NO
+
+# --- Cleanliness ---
+QUIET                  = NO
+JAVADOC_AUTOBRIEF      = YES
+FULL_PATH_NAMES        = NO
+STRIP_FROM_PATH        = .
+
+# --- Preprocessor (helpful for conditional compilation) ---
+# If your docs should reflect a specific log level, set it here.
+# Example: PREDEFINED += LOG_LEVEL=LOG_LEVEL_DEBUG
+PREDEFINED             =
+
+# --- What to ignore ---
+EXCLUDE_PATTERNS       = \
+                         */build/* \
+                         */artifacts/* \
+                         */docs/*
