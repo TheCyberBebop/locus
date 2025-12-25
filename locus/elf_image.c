@@ -16,6 +16,8 @@ int elf_image_open(const char* path, elf_image_t* img) {
     struct stat st;
     void* addr = NULL;
 
+    TRACE("Entered %s", __func__);
+
     // Validate function parameters
     if (NULL == path || NULL == img) {
         ERROR("invalid parameter passed in");
@@ -36,14 +38,14 @@ int elf_image_open(const char* path, elf_image_t* img) {
         return -errno;
     }
 
-    // Verify size
-    if (0 == st.st_size) {
-        ERROR("'%s' is zero bytes", path);
+    /* Verify file size: must be large enough to contain at least an ELF32
+     * header */
+    if ((size_t)st.st_size < sizeof(Elf32_Ehdr)) {
+        ERROR("'%s' is too small to be an ELF file (cur size=%zu, min req=%zu)",
+              path, (size_t)st.st_size, sizeof(Elf32_Ehdr));
         close(fd);
         return -EINVAL;
     }
-
-    // TODO validate size vs std elf hdr len (both 64/32-bit)
 
     /* Map the entire file into memory as a read-only, private mapping. Creates
      * a stable, immutable byte view of the ELF for inspection, without copying
@@ -63,6 +65,7 @@ int elf_image_open(const char* path, elf_image_t* img) {
     img->path = path;
 
     INFO("Mapped ELF '%s' (size=%zu bytes at %p)", path, img->size, img->base);
+    TRACE("Finished %s", __func__);
 
     return 0;
 }

@@ -7,6 +7,8 @@
 int main(int argc, char* argv[]) {
     elf_image_t img;
 
+    TRACE("Entered %s", __func__);
+
     // Expect exactly one argument: the path to an ELF file to inspect
     if (2 != argc) {
         ERROR("usage: %s <elf-file>", argv[0]);
@@ -22,6 +24,8 @@ int main(int argc, char* argv[]) {
         ERROR("failed to open ELF image");
         return EXIT_FAILURE;
     }
+
+    TRACE("Finished %s", __func__);
 
     return EXIT_SUCCESS;
 }
