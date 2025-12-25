@@ -131,7 +131,7 @@ They are feature and understanding-driven, not time-based.
 - [X] Implement logging functionality
 
 ### Core ELF Parsing & Validation
-- [ ] Open and validate ELF files
+- [X] Open and validate ELF files
 - [ ] Parse and log ELF headers
 - [ ] Validate ELF class, endianness, and ABI
 - [ ] Parse and log program headers
