@@ -186,4 +186,4 @@ void log_msg(log_level_t lvl,
 }
 #endif
 
-#endif
+#endif /* LOGGER_H */
