@@ -18,11 +18,12 @@ CC           ?= gcc
 DOXYGEN      ?= doxygen
 
 # -------- Build config --------
-RM            := rm -rf
-ARTIFACTS_DIR := artifacts
-BUILD_DIR     := build
-DOCS_DIR      := docs
-DOXYFILE      := Doxyfile
+RM             := rm -rf
+ARTIFACTS_DIR  := artifacts
+BUILD_ROOT_DIR := build
+BUILD_DIR      := $(BUILD_ROOT_DIR)/log-$(LOG)
+DOCS_DIR       := docs
+DOXYFILE       := Doxyfile
 
 # -------- Build Debug --------
 # Usage:
@@ -215,10 +216,10 @@ $$(ARCH_ART_DIR_$(1)): | $(ARTIFACTS_DIR)
 $$(ARCH_ART_DIR_$(1))/tests: | $$(ARCH_ART_DIR_$(1))
 	$(Q)mkdir -p $$@
 
-$$(ARCH_BUILD_DIR_$(1))/locus: | $(BUILD_DIR)
+$$(ARCH_BUILD_DIR_$(1))/locus: | $(BUILD_ROOT_DIR)
 	$(Q)mkdir -p $$@
 
-$$(ARCH_BUILD_DIR_$(1))/tests: | $(BUILD_DIR)
+$$(ARCH_BUILD_DIR_$(1))/tests: | $(BUILD_ROOT_DIR)
 	$(Q)mkdir -p $$@
 
 # ---- 1) Compile locus .c -> build/<arch>/locus/*.o (+ .d) ----
@@ -258,7 +259,7 @@ $(foreach tc,$(TOOLCHAINS),$(eval $(call GEN_CROSS_BUILDS,$(tc))))
 $(ARTIFACTS_DIR):
 	$(Q)mkdir -p $@
 
-$(BUILD_DIR):
+$(BUILD_ROOT_DIR):
 	$(Q)mkdir -p $@
 
 # -------- Build target expansion --------
@@ -316,7 +317,7 @@ clean:
 	@echo ""
 	@echo "Cleaning up artifacts, build, and docs ..."
 	@echo ""
-	$(Q)$(RM) $(ARTIFACTS_DIR) $(BUILD_DIR) $(DOCS_DIR)
+	$(Q)$(RM) $(ARTIFACTS_DIR) $(BUILD_ROOT_DIR) $(DOCS_DIR)   
 
 # -------- Documentation (Doxygen) --------
 # Generate a default Doxyfile if missing (one-time bootstrap)
@@ -334,7 +335,7 @@ docs: $(DOXYFILE)
 
 help:
 	@echo "Usage:"
-	@echo "  make [target] [ARCH=<arch>] [VERBOSE=1] [VERY_VERBOSE=1] [DEBUG=m|v|b|a]"
+	@echo "  make [target] [LOG=LOG_LEVEL_INFO] [ARCH=<arch>] [VERBOSE=1] [VERY_VERBOSE=1] [DEBUG=m|v|b|a]"
 	@echo ""
 	@echo "Targets: all native native_static tests tests_static locus locus_static docs clean"
 	@echo ""
