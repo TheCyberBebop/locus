@@ -53,6 +53,26 @@ typedef struct {
 } elf_image_t;
 
 /**
+ * @struct elf_ident_info_t
+ * @brief Decoder configuration derived from an ELF file's e_ident[] bytes.
+ *
+ * This structure captures the minimum information needed to interpret an ELF
+ * file safely (class and byte order), plus a few identification fields that are
+ * useful for logging and diagnostics.
+ *
+ * Once populated by elf_validate_ident(), higher-level parsing code should use
+ * these values to select the correct header layouts (ELF32 vs ELF64) and to
+ * decode all multi-byte fields according to the file's endianness.
+ */
+typedef struct {
+    uint8_t ei_class;      /**< EI_CLASS: ELFCLASS32 or ELFCLASS64 */
+    uint8_t ei_data;       /**< EI_DATA:  ELFDATA2LSB or ELFDATA2MSB */
+    uint8_t ei_version;    /**< EI_VERSION (expect EV_CURRENT) */
+    uint8_t ei_osabi;      /**< EI_OSABI */
+    uint8_t ei_abiversion; /**< EI_ABIVERSION */
+} elf_ident_info_t;
+
+/**
  * @brief Open and memory-map an ELF file for read-only inspection.
  *
  * This function opens the file at @p path, obtains its size, and creates a
@@ -69,6 +89,28 @@ typedef struct {
  * @return 0 on success, or a negative errno-style value on failure.
  */
 int elf_image_open(const char* path, elf_image_t* img);
+
+/**
+ * @brief Validate the ELF identification bytes (e_ident) and populate decoder
+ * info.
+ *
+ * Checks:
+ *  - ELF magic
+ *  - class (ELF32/ELF64)
+ *  - endianness (LSB/MSB)
+ *  - ident version (EV_CURRENT)
+ *
+ * On success, fills @p out with the decoder configuration required for all
+ * subsequent parsing (class/endianness).
+ *
+ * @param img Mapped ELF image (read-only byte view).
+ * @param out Output decoder info to populate on success.
+ *
+ * @return 0 on success, or negative errno-style value on failure.
+ *         -EINVAL  malformed / not ELF / too small
+ *         -ENOTSUP valid ELF but unsupported class/encoding
+ */
+int elf_validate_ident(const elf_image_t* img, elf_ident_info_t* out);
 
 #ifdef __cplusplus
 }

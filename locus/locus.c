@@ -6,6 +6,7 @@
 
 int main(int argc, char* argv[]) {
     elf_image_t img;
+    elf_ident_info_t ident;
 
     TRACE("Entered %s", __func__);
 
@@ -19,9 +20,16 @@ int main(int argc, char* argv[]) {
 
     /* Open and memory-map the ELF file into a read-only image, which will be
      * used for subsequent validation and parsing */
-    int ret = elf_image_open(argv[1], &img);
-    if (ret < 0) {
+    if (elf_image_open(argv[1], &img) < 0) {
         ERROR("failed to open ELF image");
+        return EXIT_FAILURE;
+    }
+
+    /* Validate the ELF identification fields (e_ident) and populate the
+     * decoder configuration, which determines how all subsequent ELF
+     * headers and segments must be interpreted (class and endianness). */
+    if (elf_validate_ident(&img, &ident) < 0) {
+        ERROR("ELF identification validation failed");
         return EXIT_FAILURE;
     }
 
