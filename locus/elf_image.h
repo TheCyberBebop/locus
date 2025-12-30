@@ -33,7 +33,6 @@ extern "C" {
 #endif
 
 /**
- *
  * @struct elf_image_t
  * @brief Read-only view of an ELF file mapped into memory.
  *

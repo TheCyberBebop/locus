@@ -80,7 +80,7 @@ int elf_validate_ident(const elf_image_t* img, elf_ident_info_t* out) {
 
     // Validate function parameters
     if (NULL == img || NULL == out) {
-        ERROR("invalid function parameter");
+        ERROR("invalid parameter (img=%p out=%p)", (void*)img, (void*)out);
         return -EINVAL;
     }
 

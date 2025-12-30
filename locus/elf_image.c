@@ -22,7 +22,7 @@ int elf_image_open(const char* path, elf_image_t* img) {
 
     // Validate function parameters
     if (NULL == path || NULL == img) {
-        ERROR("invalid function parameter");
+        ERROR("invalid parameter (path=%p img=%p)", (void*)path, (void*)img);
         return -EINVAL;
     }
 
@@ -94,17 +94,31 @@ int elf_image_close(elf_image_t* img) {
 
     // Validate function parameters
     if (NULL == img) {
-        ERROR("invalid function parameter");
+        ERROR("invalid parameter (img=%p)", (void*)img);
         return -EINVAL;
     }
 
     /* If the image is currently mapped, unmap it and reset the structure.
      * This function is safe to call multiple times on the same elf_image_t. */
-    if (NULL != img->base && img->size > 0) {
+    if (NULL != img->base) {
+        if (0 == img->size) {
+            ERROR("inconsistent state (base=%p, size=0) for '%s'",
+                  (void*)img->base, img->path ? img->path : "(unknown)");
+            // Can't munmap safely; best effort is to clear fields
+            img->base = NULL;
+            img->size = 0;
+            img->path = NULL;
+            return -EINVAL;
+        }
         if (munmap((void*)img->base, img->size) < 0) {
             ERROR("munmap() failed: %s (%d)", strerror(errno), errno);
             return -errno;
         }
+    } else if (0 != img->size) {
+        /* Something went wrong, we should never have a size without base. Print
+         * error and clear anyway. */
+        ERROR("inconsistent state (base=NULL, size=%zu) for '%s'", img->size,
+              img->path ? img->path : "(unknown)");
     }
 
     // Clear fields to prevent accidental reuse
