@@ -21,9 +21,10 @@ DOXYGEN      ?= doxygen
 RM             := rm -rf
 ARTIFACTS_DIR  := artifacts
 BUILD_ROOT_DIR := build
-BUILD_DIR      := $(BUILD_ROOT_DIR)/log-$(LOG)
+BUILD_DIR      := $(BUILD_ROOT_DIR)/$(LOG)
 DOCS_DIR       := docs
 DOXYFILE       := Doxyfile
+CC_NATIVE      := $(CC)
 
 # -------- Build Debug --------
 # Usage:
@@ -97,10 +98,24 @@ CFLAGS_COMMON   := -O0 -g -Wall -Wextra -Werror -Wpedantic -fno-omit-frame-point
 CFLAGS_TESTS    := -O0 -g -fno-omit-frame-pointer -MMD -MP
 
 # -------- Source files --------
-LOCUS_SRC  := $(wildcard locus/*.c)
-TEST_SRCS  := $(wildcard tests/*.c)
+# LOCUS library sources (everything except the locus entrypoint)
+LOCUS_LIB_SRC := $(filter-out locus/locus.c,$(wildcard locus/*.c))
+LOCUS_APP_SRC := locus/locus.c
+TEST_SRCS     := $(wildcard tests/*.c)
 # Isolate test file names for building
-TEST_NAMES := $(notdir $(basename $(TEST_SRCS)))
+TEST_NAMES    := $(notdir $(basename $(TEST_SRCS)))
+
+# -------- Unit tests (cmocka) --------
+UNIT_DIR   := unit_tests
+UNIT_SRCS  := $(wildcard $(UNIT_DIR)/*.c)
+UNIT_BUILD := $(BUILD_DIR)/unit_tests
+UNIT_BIN   := $(UNIT_BUILD)/locus_tests
+
+# Object files for unit tests (native only)
+UNIT_OBJS := $(patsubst $(UNIT_DIR)/%.c,$(UNIT_BUILD)/%.o,$(UNIT_SRCS))
+
+# LOCUS objects compiled for unit tests (native compile flags)
+UNIT_LOCUS_OBJS := $(patsubst locus/%.c,$(UNIT_BUILD)/locus/%.o,$(LOCUS_LIB_SRC))
 
 # -------- Toolchains and Architecture Mappings --------
 # Includes host compiler (CC) with no prefix
@@ -177,7 +192,10 @@ endif
 endif
 
 # -------- Include all generated dependency (.d) files (from build/) --------
-DEPS := $(wildcard $(BUILD_DIR)/*/locus/*.d) $(wildcard $(BUILD_DIR)/*/tests/*.d)
+DEPS := $(wildcard $(BUILD_DIR)/*/locus/*.d) \
+        $(wildcard $(BUILD_DIR)/*/tests/*.d) \
+        $(wildcard $(UNIT_BUILD)/*.d) \
+        $(wildcard $(UNIT_BUILD)/locus/*.d)
 -include $(DEPS)
 
 # -------- Macro to generate rules for each toolchain --------
@@ -204,7 +222,7 @@ CC_$(1) := $(1)-gcc
 endif
 
 # locus objects: build/<arch>/locus/<name>.o
-OBJS_$(1) := $$(patsubst locus/%.c,$$(ARCH_BUILD_DIR_$(1))/locus/%.o,$(LOCUS_SRC))
+OBJS_$(1) := $$(patsubst locus/%.c,$$(ARCH_BUILD_DIR_$(1))/locus/%.o,$(LOCUS_LIB_SRC) $(LOCUS_APP_SRC))
 
 # Test objects: build/<arch>/tests/<testname>.o
 TEST_OBJS_$(1) := $$(patsubst tests/%.c,$$(ARCH_BUILD_DIR_$(1))/tests/%.o,$(TEST_SRCS))
@@ -262,16 +280,38 @@ $(ARTIFACTS_DIR):
 $(BUILD_ROOT_DIR):
 	$(Q)mkdir -p $@
 
+# -------- Unit tests (native, cmocka) --------
+$(UNIT_BUILD): | $(BUILD_ROOT_DIR)
+	$(Q)mkdir -p $@
+
+$(UNIT_BUILD)/locus: | $(UNIT_BUILD)
+	$(Q)mkdir -p $@
+
+# Compile unit test sources -> build/.../unit_tests/*.o
+$(UNIT_BUILD)/%.o: $(UNIT_DIR)/%.c | $(UNIT_BUILD)
+	@echo "==> [unit] CC $<"
+	$(Q)$(CC_NATIVE) $(CPPFLAGS_COMMON) $(CFLAGS_COMMON) -I$(UNIT_DIR) -c -o $@ $<
+
+# Compile locus sources for unit tests -> build/.../unit_tests/locus/*.o
+$(UNIT_BUILD)/locus/%.o: locus/%.c | $(UNIT_BUILD)/locus
+	@echo "==> [unit] CC $<"
+	$(Q)$(CC_NATIVE) $(CPPFLAGS_COMMON) $(CFLAGS_COMMON) -I$(UNIT_DIR) -c -o $@ $<
+
+# Link unit test runner (links cmocka)
+$(UNIT_BIN): $(UNIT_OBJS) $(UNIT_LOCUS_OBJS) | $(UNIT_BUILD)
+	@echo "==> [unit] LD $@"
+	$(Q)$(CC_NATIVE) -o $@ $^ -lcmocka
+
 # -------- Build target expansion --------
-ALL_TESTS := $(foreach tc,$(TOOLCHAINS_SELECTED), \
-             $(foreach t,$(TEST_NAMES),$(ARTIFACTS_DIR)/$(OUT_$(tc))/tests/$(t)))
-ALL_TESTS_STATIC := $(foreach tc,$(TOOLCHAINS_SELECTED), \
-                    $(foreach t,$(TEST_NAMES),$(ARTIFACTS_DIR)/$(OUT_$(tc))/tests/$(t)_static))
-ALL_LOCUS := $(foreach tc,$(TOOLCHAINS_SELECTED),$(ARTIFACTS_DIR)/$(OUT_$(tc))/locus)
-ALL_LOCUS_STATIC := $(foreach tc,$(TOOLCHAINS_SELECTED),$(ARTIFACTS_DIR)/$(OUT_$(tc))/locus_static)
-NATIVE_TESTS := $(foreach t,$(TEST_NAMES),$(ARTIFACTS_DIR)/$(OUT_native)/tests/$(t))
+ALL_TESTS           := $(foreach tc,$(TOOLCHAINS_SELECTED), \
+                       $(foreach t,$(TEST_NAMES),$(ARTIFACTS_DIR)/$(OUT_$(tc))/tests/$(t)))
+ALL_TESTS_STATIC    := $(foreach tc,$(TOOLCHAINS_SELECTED), \
+                       $(foreach t,$(TEST_NAMES),$(ARTIFACTS_DIR)/$(OUT_$(tc))/tests/$(t)_static))
+ALL_LOCUS           := $(foreach tc,$(TOOLCHAINS_SELECTED),$(ARTIFACTS_DIR)/$(OUT_$(tc))/locus)
+ALL_LOCUS_STATIC    := $(foreach tc,$(TOOLCHAINS_SELECTED),$(ARTIFACTS_DIR)/$(OUT_$(tc))/locus_static)
+NATIVE_TESTS        := $(foreach t,$(TEST_NAMES),$(ARTIFACTS_DIR)/$(OUT_native)/tests/$(t))
 NATIVE_TESTS_STATIC := $(foreach t,$(TEST_NAMES),$(ARTIFACTS_DIR)/$(OUT_native)/tests/$(t)_static)
-NATIVE_LOCUS := $(ARTIFACTS_DIR)/$(OUT_native)/locus
+NATIVE_LOCUS        := $(ARTIFACTS_DIR)/$(OUT_native)/locus
 NATIVE_LOCUS_STATIC := $(ARTIFACTS_DIR)/$(OUT_native)/locus_static
 
 all: tests tests_static locus locus_static docs
@@ -306,6 +346,15 @@ locus_static: check-toolchains $(ALL_LOCUS_STATIC)
 	@echo "Finished building static locus binaries."
 	@echo ""
 
+unit_tests: $(UNIT_BIN)
+	@echo ""
+	@echo "==> Running unit tests"
+	@echo ""
+	$(Q)$(UNIT_BIN)
+	@echo ""
+	@echo "Finished running unit tests."
+	@echo ""
+
 # Fail if a cross compiler isn't installed (skip native)
 check-toolchains:
 	@for tc in $(TOOLCHAINS_SELECTED); do \
@@ -337,7 +386,7 @@ help:
 	@echo "Usage:"
 	@echo "  make [target] [LOG=LOG_LEVEL_INFO] [ARCH=<arch>] [VERBOSE=1] [VERY_VERBOSE=1] [DEBUG=m|v|b|a]"
 	@echo ""
-	@echo "Targets: all native native_static tests tests_static locus locus_static docs clean"
+	@echo "Targets: all native native_static tests tests_static locus locus_static unit_tests docs clean"
 	@echo ""
 	@echo "Valid ARCH values:"
 	@echo "  $(foreach tc,$(TOOLCHAINS),$(OUT_$(tc)))"
@@ -345,4 +394,5 @@ help:
 	@echo "Selected toolchains:"
 	@echo "  $(TOOLCHAINS_SELECTED)"
 
-.PHONY: all native native_static tests tests_static locus locus_static check-toolchains clean help docs
+.PHONY: all native native_static tests tests_static locus locus_static unit_tests \
+        check-toolchains clean docs help

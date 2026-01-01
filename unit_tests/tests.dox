@@ -1,0 +1,62 @@
+/**
+ * @defgroup locus_tests Unit Tests
+ * @brief Unit tests for LOCUS components.
+ *
+ * LOCUS includes unit tests for all core ELF loader modules.
+ * These tests validate defensive behavior, invariants, and
+ * failure modes at each abstraction layer.
+ */
+
+/**
+ * @defgroup elf_image_tests elf_image Tests
+ * @ingroup locus_tests
+ * @brief Unit tests for the elf_image abstraction.
+ *
+ * This test suite validates the defensive behavior and core invariants of the
+ * elf_image module, including argument validation, file property checks, and
+ * safe failure modes.
+ *
+ * The elf_image module is responsible solely for acquiring and managing a
+ * stable, read-only byte view of an ELF file via memory mapping. It performs
+ * no ELF semantic validation beyond what is required to establish a valid
+ * byte range.
+ *
+ * These tests intentionally avoid higher-level ELF parsing and interpretation
+ * to ensure failures can be attributed exclusively to elf_image behavior.
+ */
+
+/**
+ * @defgroup elf_ident_tests elf_ident Tests
+ * @ingroup locus_tests
+ * @brief Unit tests for ELF identification parsing and validation.
+ *
+ * This test suite validates the defensive behavior of elf_validate_ident(),
+ * focusing on argument validation and failure modes at the ELF identification
+ * layer.
+ *
+ * The elf_ident module operates on an already-initialized elf_image_t and
+ * interprets only the e_ident[] bytes at the start of the ELF file. These
+ * tests intentionally avoid file I/O and higher-level ELF parsing to ensure
+ * failures can be attributed solely to ELF identification logic.
+ *
+ * All test inputs are constructed to respect the elf_image abstraction
+ * boundary: elf_ident does not create or manage ELF images, it only consumes
+ * them.
+ */
+
+/**
+ * @defgroup elf_read_tests elf_read Tests
+ * @ingroup locus_tests
+ * @brief Unit tests for endian-aware ELF field read helpers.
+ *
+ * This test suite validates the defensive behavior of the elf_read_* helpers,
+ * which provide bounds-checked, endian-aware access to multi-byte ELF fields
+ * within an ELF image.
+ *
+ * The elf_read module operates on an already-initialized elf_image_t and
+ * validated ELF identification information. These tests focus exclusively on
+ * argument validation and failure modes, not on successful decoding paths.
+ *
+ * Higher-level ELF parsing and semantic validation are intentionally excluded
+ * to ensure failures can be attributed solely to elf_read behavior.
+ */

@@ -28,6 +28,7 @@ RUN apt-get update && \
     unzip \
     less \
     vim \
+    libcmocka-dev \
     # ==========================
     # Native (host: amd64, little-endian)
     # ==========================
