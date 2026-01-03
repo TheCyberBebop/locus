@@ -58,8 +58,6 @@ static inline int validate_read_args(const elf_image_t* img,
                                      void* out,
                                      size_t offset,
                                      size_t width) {
-    const char* path = NULL;
-
     // Validate function parameters
     if (NULL == img || NULL == ident || NULL == out) {
         ERROR("invalid parameter (img=%p ident=%p out=%p)", (void*)img,
@@ -73,7 +71,9 @@ static inline int validate_read_args(const elf_image_t* img,
         return -EINVAL;
     }
 
-    path = img->path ? img->path : "(unknown)";  // Not critical
+#if LOG_LEVEL <= LOG_LEVEL_ERROR
+    const char path = img->path ? img->path : "(unknown)";  // Not critical
+#endif
 
     /* We must know the file endianness to correctly decode multi-byte fields.
      * elf_ident validated EI_DATA, but we defensively re-check here so these

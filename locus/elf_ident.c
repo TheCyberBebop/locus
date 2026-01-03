@@ -12,6 +12,7 @@ static bool check_magic(const uint8_t* e_ident) {
            e_ident[EI_MAG2] == ELFMAG2 && e_ident[EI_MAG3] == ELFMAG3;
 }
 
+#if LOG_LEVEL <= LOG_LEVEL_INFO
 static const char* get_class_str(uint8_t class) {
     switch (class) {
         case ELFCLASS32:
@@ -68,13 +69,13 @@ static const char* get_osabi_str(uint8_t osabi) {
             return "Other/Unknown";
     }
 }
+#endif
 
 int elf_validate_ident(const elf_image_t* img, elf_ident_info_t* out) {
     uint8_t ei_class = 0;
     uint8_t ei_data = 0;
     uint8_t ei_version = 0;
     const uint8_t* ident = NULL;
-    const char* path = NULL;
 
     TRACE("Entered %s", __func__);
 
@@ -90,7 +91,9 @@ int elf_validate_ident(const elf_image_t* img, elf_ident_info_t* out) {
         return -EINVAL;
     }
 
-    path = img->path ? img->path : "(unknown)";  // Not critical
+#if LOG_LEVEL <= LOG_LEVEL_ERROR
+    const char path = img->path ? img->path : "(unknown)";  // Not critical
+#endif
 
     /* Size needs at least EI_NIDENT bytes to safely index e_ident fields.
      * Handles elf_image_t->size == 0 as well. */
