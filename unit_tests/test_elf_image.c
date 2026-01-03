@@ -79,7 +79,8 @@ static void test_elf_image_open_file_too_small(void** state) {
     const char* test_file = "too_small.bin";
     test_fs_t* fs = *state;
 
-    register_test_file(fs, test_file);  // Ensure file is removed during teardown
+    register_test_file(fs,
+                       test_file);  // Ensure file is removed during teardown
 
     // Construct a test file path under the temporary directory
     char path[512];
@@ -114,7 +115,8 @@ static void test_elf_image_open_success(void** state) {
     const char* test_file = "open_success.bin";
     test_fs_t* fs = *state;
 
-    register_test_file(fs, test_file);  // Ensure file is removed during teardown
+    register_test_file(fs,
+                       test_file);  // Ensure file is removed during teardown
 
     // Construct a test file path under the temporary directory
     char path[512];
@@ -155,7 +157,6 @@ static void test_elf_image_open_success(void** state) {
 static void test_elf_image_close_invalid_params(void** state) {
     (void)state;  // Unused; no filesystem setup required
 
-    // Passing a NULL elf_image_t must be rejected
     assert_int_equal(elf_image_close(NULL), -EINVAL);
 }
 
@@ -166,11 +167,12 @@ static void test_elf_image_close_invalid_params(void** state) {
  * This test intentionally corrupts elf_image_t after a successful open to
  * validate defensive cleanup behavior.
  */
-static void test_elf_image_close_img_size_zero(void** state) {
+static void test_elf_image_close_image_size_zero(void** state) {
     const char* test_file = "size_zero.bin";
     test_fs_t* fs = *state;
 
-    register_test_file(fs, test_file);  // Ensure file is removed during teardown
+    register_test_file(fs,
+                       test_file);  // Ensure file is removed during teardown
 
     // Construct a test file path under the temporary directory
     char path[512] = {0};
@@ -215,7 +217,8 @@ static void test_elf_image_close_munmap_error(void** state) {
     const char* test_file = "munmap_error.bin";
     test_fs_t* fs = *state;
 
-    register_test_file(fs, test_file);  // Ensure file is removed during teardown
+    register_test_file(fs,
+                       test_file);  // Ensure file is removed during teardown
 
     // Construct a test file path under the temporary directory
     char path[512];
@@ -258,11 +261,12 @@ static void test_elf_image_close_munmap_error(void** state) {
  * otherwise leak the mapping, the test saves the original mapping information
  * and performs explicit munmap() cleanup.
  */
-static void test_elf_image_close_img_base_null(void** state) {
+static void test_elf_image_close_image_base_null(void** state) {
     const char* test_file = "base_null.bin";
     test_fs_t* fs = *state;
 
-    register_test_file(fs, test_file);  // Ensure file is removed during teardown
+    register_test_file(fs,
+                       test_file);  // Ensure file is removed during teardown
 
     // Construct a test file path under the temporary directory
     char path[512];
@@ -303,7 +307,8 @@ static void test_elf_image_close_double_close(void** state) {
     const char* test_file = "double_close.bin";
     test_fs_t* fs = *state;
 
-    register_test_file(fs, test_file);  // Ensure file is removed during teardown
+    register_test_file(fs,
+                       test_file);  // Ensure file is removed during teardown
 
     // Construct a test file path under the temporary directory
     char path[512];
@@ -362,8 +367,10 @@ static void test_elf_image_open_close_reuse(void** state) {
     const char* test_file2 = "reuse_two.bin";
     test_fs_t* fs = *state;
 
-    register_test_file(fs, test_file1);  // Ensure file is removed during teardown
-    register_test_file(fs, test_file2);  // Ensure file is removed during teardown
+    register_test_file(fs,
+                       test_file1);  // Ensure file is removed during teardown
+    register_test_file(fs,
+                       test_file2);  // Ensure file is removed during teardown
 
     char path1[512];
     char path2[512];
@@ -418,7 +425,8 @@ static void test_elf_image_close_success(void** state) {
     const char* test_file = "close_success.bin";
     test_fs_t* fs = *state;
 
-    register_test_file(fs, test_file);  // Ensure file is removed during teardown
+    register_test_file(fs,
+                       test_file);  // Ensure file is removed during teardown
 
     // Construct a test file path under the temporary directory
     char path[512];
@@ -459,11 +467,11 @@ size_t register_elf_image_tests(struct CMUnitTest** out) {
                                         test_setup_fs, test_teardown_fs),
         /* elf_image_close() tests */
         cmocka_unit_test(test_elf_image_close_invalid_params),
-        cmocka_unit_test_setup_teardown(test_elf_image_close_img_size_zero,
+        cmocka_unit_test_setup_teardown(test_elf_image_close_image_size_zero,
                                         test_setup_fs, test_teardown_fs),
         cmocka_unit_test_setup_teardown(test_elf_image_close_munmap_error,
                                         test_setup_fs, test_teardown_fs),
-        cmocka_unit_test_setup_teardown(test_elf_image_close_img_base_null,
+        cmocka_unit_test_setup_teardown(test_elf_image_close_image_base_null,
                                         test_setup_fs, test_teardown_fs),
         cmocka_unit_test_setup_teardown(test_elf_image_close_double_close,
                                         test_setup_fs, test_teardown_fs),
