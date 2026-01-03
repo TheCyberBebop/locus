@@ -6,24 +6,56 @@
 #include "elf_read.h"
 #include "test_suites.h"
 
+/* -------------------------------------------------------------------------- */
+/* elf_read_u*() tests                                                        */
+/* -------------------------------------------------------------------------- */
+
 /*
  * Verify that elf_read_u16() defensively rejects invalid arguments.
  *
  * This test exercises only parameter validation logic.
  */
 static void test_elf_read_u16_invalid_params(void** state) {
-    (void)state;  // Silence compile warning
+    (void)state;  // Unused; no filesystem setup required
 
-    elf_image_t img = {0};         // TODO Update struct contents
-    elf_ident_info_t ident = {0};  // TODO Update struct contents
+    elf_image_t img = {0};
+    elf_ident_info_t ident = {0};
     uint16_t out;
-
-    // Passing a NULL elf_image_t must be rejected
     assert_int_equal(elf_read_u16(NULL, &ident, 0, &out), -EINVAL);
-    // Passing a NULL elf_ident_info_t must be rejected
     assert_int_equal(elf_read_u16(&img, NULL, 0, &out), -EINVAL);
-    // Passing a NULL uint16_t must be rejected
     assert_int_equal(elf_read_u16(&img, &ident, 0, NULL), -EINVAL);
+}
+
+/*
+ * Verify that elf_read_u32() defensively rejects invalid arguments.
+ *
+ * This test exercises only parameter validation logic.
+ */
+static void test_elf_read_u32_invalid_params(void** state) {
+    (void)state;  // Unused; no filesystem setup required
+
+    elf_image_t img = {0};
+    elf_ident_info_t ident = {0};
+    uint32_t out;
+    assert_int_equal(elf_read_u32(NULL, &ident, 0, &out), -EINVAL);
+    assert_int_equal(elf_read_u32(&img, NULL, 0, &out), -EINVAL);
+    assert_int_equal(elf_read_u32(&img, &ident, 0, NULL), -EINVAL);
+}
+
+/*
+ * Verify that elf_read_u64() defensively rejects invalid arguments.
+ *
+ * This test exercises only parameter validation logic.
+ */
+static void test_elf_read_u64_invalid_params(void** state) {
+    (void)state;  // Unused; no filesystem setup required
+
+    elf_image_t img = {0};
+    elf_ident_info_t ident = {0};
+    uint64_t out;
+    assert_int_equal(elf_read_u64(NULL, &ident, 0, &out), -EINVAL);
+    assert_int_equal(elf_read_u64(&img, NULL, 0, &out), -EINVAL);
+    assert_int_equal(elf_read_u64(&img, &ident, 0, NULL), -EINVAL);
 }
 
 /*
@@ -36,6 +68,8 @@ static void test_elf_read_u16_invalid_params(void** state) {
 size_t register_elf_read_tests(struct CMUnitTest** out) {
     static struct CMUnitTest tests[] = {
         cmocka_unit_test(test_elf_read_u16_invalid_params),
+        cmocka_unit_test(test_elf_read_u32_invalid_params),
+        cmocka_unit_test(test_elf_read_u64_invalid_params),
     };
 
     *out = tests;

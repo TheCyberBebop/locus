@@ -8,6 +8,10 @@
 #include "test_suites.h"
 #include "test_utilities.h"
 
+/* -------------------------------------------------------------------------- */
+/* elf_validate_ident() tests                                                 */
+/* -------------------------------------------------------------------------- */
+
 /*
  * Verify that elf_validate_ident() defensively rejects invalid arguments.
  *
