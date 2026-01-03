@@ -5,9 +5,17 @@
 #include <stdlib.h>
 #include <unistd.h>
 
+#include "test_suites.h"
 #include "test_utilities.h"
 
-int write_file(const char* path, const uint8_t* buf, size_t len) {
+void register_test_file(test_fs_t* fs, const char* name) {
+    assert_non_null(fs);
+    assert_non_null(name);
+    assert_true(fs->file_count < TEST_MAX_FILES);
+    fs->test_files[fs->file_count++] = name;
+}
+
+int test_write_file(const char* path, const uint8_t* buf, size_t len) {
     ssize_t ret = 0;
     int saved = 0;
     int fd = -1;
@@ -37,13 +45,13 @@ int write_file(const char* path, const uint8_t* buf, size_t len) {
     return 0;
 }
 
-int setup_image_tests(void** state) {
+int test_setup_fs(void** state) {
     char path_template[] = "/tmp/locus-unit-tests-XXXXXX";
     char* temp_path = NULL;
-    image_test_fs_t* fs = NULL;
+    test_fs_t* fs = NULL;
 
     // Allocate memory for per-test filesystem state (temporary directory path)
-    fs = (image_test_fs_t*)calloc(1, sizeof(*fs));
+    fs = (test_fs_t*)calloc(1, sizeof(*fs));
     if (NULL == fs) {
         return -ENOMEM;
     }
@@ -63,40 +71,26 @@ int setup_image_tests(void** state) {
     return 0;
 }
 
-int teardown_image_tests(void** state) {
-    image_test_fs_t* fs = (image_test_fs_t*)(*state);
-    if (NULL == fs) {
-        return 0;  // Best-effort teardown
-    }
-
+int test_teardown_fs(void** state) {
     char path[512] = {0};
+    test_fs_t* fs = (test_fs_t*)(*state);
 
-    /* Known test artifacts created under the temporary directory.
-     * Each entry is a filename relative to fs->temp_path. */
-    static const char* test_files[] = {
-        /* elf_image_open() tests */
-        "too_small.bin",
-        "open_success.bin",
-        /* elf_image_close() tests */
-        "size_zero.bin",
-        "munmap_error.bin",
-        "base_null.bin",
-        "double_close.bin",
-        "reuse_one.bin",
-        "reuse_two.bin",
-        "close_success.bin",
-    };
+    if (NULL != fs) {
+        /* Known test artifacts created under the temporary directory. Each
+         * entry is a filename relative to fs->temp_path. */
+        for (size_t i = 0; i < fs->file_count; i++) {
+            snprintf(path, sizeof(path), "%s/%s", fs->temp_path,
+                     fs->test_files[i]);
+            unlink(path);  // Best-effort cleanup
+        }
 
-    for (size_t i = 0; i < sizeof(test_files) / sizeof(test_files[0]); i++) {
-        snprintf(path, sizeof(path), "%s/%s", fs->temp_path, test_files[i]);
-        unlink(path);  // Best-effort cleanup
+        // Remove temporary directory
+        rmdir(fs->temp_path);
+
+        // Cleanup state
+        free(fs);
+        *state = NULL;
     }
 
-    // Remove temporary directory
-    rmdir(fs->temp_path);
-
-    // Cleanup state
-    free(fs);
-    *state = NULL;
     return 0;
 }

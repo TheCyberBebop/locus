@@ -55,8 +55,8 @@ static void test_elf_image_open_nonexistent_path(void** state) {
  * to open a directory must fail without creating a mapping or modifying
  * the elf_image_t state.
  */
-static void test_elf_image_open_rejects_directory(void** state) {
-    image_test_fs_t* fs = *state;
+static void test_elf_image_open_invalid_file(void** state) {
+    test_fs_t* fs = *state;
 
     elf_image_t img = {0};
     assert_int_equal(elf_image_open(fs->temp_path, &img), -EINVAL);
@@ -76,16 +76,19 @@ static void test_elf_image_open_rejects_directory(void** state) {
  * partially initializing elf_image_t.
  */
 static void test_elf_image_open_file_too_small(void** state) {
-    image_test_fs_t* fs = *state;
+    const char* test_file = "too_small.bin";
+    test_fs_t* fs = *state;
+
+    register_test_file(fs, test_file);  // Ensure file is removed during teardown
 
     // Construct a test file path under the temporary directory
     char path[512];
-    snprintf(path, sizeof(path), "%s/too_small.bin", fs->temp_path);
+    snprintf(path, sizeof(path), "%s/%s", fs->temp_path, test_file);
 
     // Intentionally smaller than sizeof(Elf32_Ehdr)
     uint8_t buf[16];
     memset(buf, 0xFF, sizeof(buf));
-    assert_int_equal(write_file(path, buf, sizeof(buf)), 0);
+    assert_int_equal(test_write_file(path, buf, sizeof(buf)), 0);
 
     elf_image_t img = {0};
     assert_int_equal(elf_image_open(path, &img), -EINVAL);
@@ -108,16 +111,19 @@ static void test_elf_image_open_file_too_small(void** state) {
  *  - successful cleanup via elf_image_close()
  */
 static void test_elf_image_open_success(void** state) {
-    image_test_fs_t* fs = *state;
+    const char* test_file = "open_success.bin";
+    test_fs_t* fs = *state;
+
+    register_test_file(fs, test_file);  // Ensure file is removed during teardown
 
     // Construct a test file path under the temporary directory
     char path[512];
-    snprintf(path, sizeof(path), "%s/open_success.bin", fs->temp_path);
+    snprintf(path, sizeof(path), "%s/%s", fs->temp_path, test_file);
 
     // Write a known byte pattern to the file
     uint8_t buf[64];
     memset(buf, 0xFF, sizeof(buf));
-    assert_int_equal(write_file(path, buf, sizeof(buf)), 0);
+    assert_int_equal(test_write_file(path, buf, sizeof(buf)), 0);
 
     elf_image_t img = {0};
     assert_int_equal(elf_image_open(path, &img), 0);
@@ -161,16 +167,19 @@ static void test_elf_image_close_invalid_params(void** state) {
  * validate defensive cleanup behavior.
  */
 static void test_elf_image_close_img_size_zero(void** state) {
-    image_test_fs_t* fs = *state;
+    const char* test_file = "size_zero.bin";
+    test_fs_t* fs = *state;
+
+    register_test_file(fs, test_file);  // Ensure file is removed during teardown
 
     // Construct a test file path under the temporary directory
     char path[512] = {0};
-    snprintf(path, sizeof(path), "%s/size_zero.bin", fs->temp_path);
+    snprintf(path, sizeof(path), "%s/%s", fs->temp_path, test_file);
 
     // Write arbitrary test data to the file
     uint8_t buf[64];
     memset(buf, 0xFF, sizeof(buf));
-    assert_int_equal(write_file(path, buf, sizeof(buf)), 0);
+    assert_int_equal(test_write_file(path, buf, sizeof(buf)), 0);
 
     elf_image_t img = {0};
     assert_int_equal(elf_image_open(path, &img), 0);
@@ -203,16 +212,19 @@ static void test_elf_image_close_img_size_zero(void** state) {
  *  - the image is cleared even on failure (idempotent/safe cleanup behavior)
  */
 static void test_elf_image_close_munmap_error(void** state) {
-    image_test_fs_t* fs = *state;
+    const char* test_file = "munmap_error.bin";
+    test_fs_t* fs = *state;
+
+    register_test_file(fs, test_file);  // Ensure file is removed during teardown
 
     // Construct a test file path under the temporary directory
     char path[512];
-    snprintf(path, sizeof(path), "%s/munmap_error.bin", fs->temp_path);
+    snprintf(path, sizeof(path), "%s/%s", fs->temp_path, test_file);
 
     // Write arbitrary test data to the file
     uint8_t buf[64];
     memset(buf, 0xFF, sizeof(buf));
-    assert_int_equal(write_file(path, buf, sizeof(buf)), 0);
+    assert_int_equal(test_write_file(path, buf, sizeof(buf)), 0);
 
     elf_image_t img = {0};
     assert_int_equal(elf_image_open(path, &img), 0);
@@ -247,16 +259,19 @@ static void test_elf_image_close_munmap_error(void** state) {
  * and performs explicit munmap() cleanup.
  */
 static void test_elf_image_close_img_base_null(void** state) {
-    image_test_fs_t* fs = *state;
+    const char* test_file = "base_null.bin";
+    test_fs_t* fs = *state;
+
+    register_test_file(fs, test_file);  // Ensure file is removed during teardown
 
     // Construct a test file path under the temporary directory
     char path[512];
-    snprintf(path, sizeof(path), "%s/base_null.bin", fs->temp_path);
+    snprintf(path, sizeof(path), "%s/%s", fs->temp_path, test_file);
 
     // Write arbitrary test data to the file
     uint8_t buf[64];
     memset(buf, 0xFF, sizeof(buf));
-    assert_int_equal(write_file(path, buf, sizeof(buf)), 0);
+    assert_int_equal(test_write_file(path, buf, sizeof(buf)), 0);
 
     elf_image_t img = {0};
     assert_int_equal(elf_image_open(path, &img), 0);
@@ -285,16 +300,19 @@ static void test_elf_image_close_img_base_null(void** state) {
  * safe to call again on the same elf_image_t (no double-unmap or reuse bugs).
  */
 static void test_elf_image_close_double_close(void** state) {
-    image_test_fs_t* fs = *state;
+    const char* test_file = "double_close.bin";
+    test_fs_t* fs = *state;
+
+    register_test_file(fs, test_file);  // Ensure file is removed during teardown
 
     // Construct a test file path under the temporary directory
     char path[512];
-    snprintf(path, sizeof(path), "%s/double_close.bin", fs->temp_path);
+    snprintf(path, sizeof(path), "%s/%s", fs->temp_path, test_file);
 
     // Write arbitrary test data to the file
     uint8_t buf[64];
     memset(buf, 0xAA, sizeof(buf));
-    assert_int_equal(write_file(path, buf, sizeof(buf)), 0);
+    assert_int_equal(test_write_file(path, buf, sizeof(buf)), 0);
 
     elf_image_t img = {0};
     assert_int_equal(elf_image_open(path, &img), 0);
@@ -340,12 +358,17 @@ static void test_elf_image_close_empty_image(void** state) {
  * must fully clear it.
  */
 static void test_elf_image_open_close_reuse(void** state) {
-    image_test_fs_t* fs = *state;
+    const char* test_file1 = "reuse_one.bin";
+    const char* test_file2 = "reuse_two.bin";
+    test_fs_t* fs = *state;
+
+    register_test_file(fs, test_file1);  // Ensure file is removed during teardown
+    register_test_file(fs, test_file2);  // Ensure file is removed during teardown
 
     char path1[512];
     char path2[512];
-    snprintf(path1, sizeof(path1), "%s/reuse_one.bin", fs->temp_path);
-    snprintf(path2, sizeof(path2), "%s/reuse_two.bin", fs->temp_path);
+    snprintf(path1, sizeof(path1), "%s/%s", fs->temp_path, test_file1);
+    snprintf(path2, sizeof(path2), "%s/%s", fs->temp_path, test_file2);
 
     // Write different patterns so we can distinguish mappings
     uint8_t buf1[64];
@@ -353,8 +376,8 @@ static void test_elf_image_open_close_reuse(void** state) {
     memset(buf1, 0xFF, sizeof(buf1));
     memset(buf2, 0xAA, sizeof(buf2));
 
-    assert_int_equal(write_file(path1, buf1, sizeof(buf1)), 0);
-    assert_int_equal(write_file(path2, buf2, sizeof(buf2)), 0);
+    assert_int_equal(test_write_file(path1, buf1, sizeof(buf1)), 0);
+    assert_int_equal(test_write_file(path2, buf2, sizeof(buf2)), 0);
 
     elf_image_t img = {0};
 
@@ -392,16 +415,19 @@ static void test_elf_image_open_close_reuse(void** state) {
  * safe-to-reuse state.
  */
 static void test_elf_image_close_success(void** state) {
-    image_test_fs_t* fs = *state;
+    const char* test_file = "close_success.bin";
+    test_fs_t* fs = *state;
+
+    register_test_file(fs, test_file);  // Ensure file is removed during teardown
 
     // Construct a test file path under the temporary directory
     char path[512];
-    snprintf(path, sizeof(path), "%s/close_success.bin", fs->temp_path);
+    snprintf(path, sizeof(path), "%s/%s", fs->temp_path, test_file);
 
     // Write arbitrary test data to the file
     uint8_t buf[64];
     memset(buf, 0xFF, sizeof(buf));
-    assert_int_equal(write_file(path, buf, sizeof(buf)), 0);
+    assert_int_equal(test_write_file(path, buf, sizeof(buf)), 0);
 
     elf_image_t img = {0};
     assert_int_equal(elf_image_open(path, &img), 0);
@@ -425,36 +451,27 @@ size_t register_elf_image_tests(struct CMUnitTest** out) {
         /* elf_image_open() tests */
         cmocka_unit_test(test_elf_image_open_invalid_params),
         cmocka_unit_test(test_elf_image_open_nonexistent_path),
-        cmocka_unit_test_setup_teardown(test_elf_image_open_rejects_directory,
-                                        setup_image_tests,
-                                        teardown_image_tests),
+        cmocka_unit_test_setup_teardown(test_elf_image_open_invalid_file,
+                                        test_setup_fs, test_teardown_fs),
         cmocka_unit_test_setup_teardown(test_elf_image_open_file_too_small,
-                                        setup_image_tests,
-                                        teardown_image_tests),
+                                        test_setup_fs, test_teardown_fs),
         cmocka_unit_test_setup_teardown(test_elf_image_open_success,
-                                        setup_image_tests,
-                                        teardown_image_tests),
+                                        test_setup_fs, test_teardown_fs),
         /* elf_image_close() tests */
         cmocka_unit_test(test_elf_image_close_invalid_params),
         cmocka_unit_test_setup_teardown(test_elf_image_close_img_size_zero,
-                                        setup_image_tests,
-                                        teardown_image_tests),
+                                        test_setup_fs, test_teardown_fs),
         cmocka_unit_test_setup_teardown(test_elf_image_close_munmap_error,
-                                        setup_image_tests,
-                                        teardown_image_tests),
+                                        test_setup_fs, test_teardown_fs),
         cmocka_unit_test_setup_teardown(test_elf_image_close_img_base_null,
-                                        setup_image_tests,
-                                        teardown_image_tests),
+                                        test_setup_fs, test_teardown_fs),
         cmocka_unit_test_setup_teardown(test_elf_image_close_double_close,
-                                        setup_image_tests,
-                                        teardown_image_tests),
+                                        test_setup_fs, test_teardown_fs),
         cmocka_unit_test(test_elf_image_close_empty_image),
         cmocka_unit_test_setup_teardown(test_elf_image_open_close_reuse,
-                                        setup_image_tests,
-                                        teardown_image_tests),
+                                        test_setup_fs, test_teardown_fs),
         cmocka_unit_test_setup_teardown(test_elf_image_close_success,
-                                        setup_image_tests,
-                                        teardown_image_tests),
+                                        test_setup_fs, test_teardown_fs),
     };
 
     *out = tests;
