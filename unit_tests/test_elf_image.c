@@ -10,6 +10,10 @@
 #include "elf_image.h"
 #include "test_suites.h"
 
+/* -------------------------------------------------------------------------- */
+/* cmocka helper functions                                                    */
+/* -------------------------------------------------------------------------- */
+
 /* Per-test filesystem state for elf_image unit tests. Using per-test state
  * avoids shared mutable globals and keeps tests isolated. */
 typedef struct image_test_fs {
@@ -83,21 +87,26 @@ static int teardown_image_tests(void** state) {
 
     char path[512] = {0};
 
-    // Clean up elf_image_open() test files
-    snprintf(path, sizeof(path), "%s/too_small.bin", fs->temp_path);
-    unlink(path);
-    snprintf(path, sizeof(path), "%s/open_success.bin", fs->temp_path);
-    unlink(path);
+    /* Known test artifacts created under the temporary directory.
+     * Each entry is a filename relative to fs->temp_path. */
+    static const char* test_files[] = {
+        /* elf_image_open() tests */
+        "too_small.bin",
+        "open_success.bin",
+        /* elf_image_close() tests */
+        "size_zero.bin",
+        "munmap_error.bin",
+        "base_null.bin",
+        "double_close.bin",
+        "reuse_one.bin",
+        "reuse_two.bin",
+        "close_success.bin",
+    };
 
-    // Clean up elf_image_close() test files
-    snprintf(path, sizeof(path), "%s/size_zero.bin", fs->temp_path);
-    unlink(path);
-    snprintf(path, sizeof(path), "%s/munmap_error.bin", fs->temp_path);
-    unlink(path);
-    snprintf(path, sizeof(path), "%s/base_null.bin", fs->temp_path);
-    unlink(path);
-    snprintf(path, sizeof(path), "%s/close_success.bin", fs->temp_path);
-    unlink(path);
+    for (size_t i = 0; i < sizeof(test_files) / sizeof(test_files[0]); i++) {
+        snprintf(path, sizeof(path), "%s/%s", fs->temp_path, test_files[i]);
+        unlink(path);  // Best-effort cleanup
+    }
 
     // Remove temporary directory
     rmdir(fs->temp_path);
@@ -379,6 +388,111 @@ static void test_elf_image_close_img_base_null(void** state) {
 }
 
 /*
+ * Verify that elf_image_close() can be performed multiple times.
+ *
+ * Closing a successfully-opened image must succeed, clear fields, and remain
+ * safe to call again on the same elf_image_t (no double-unmap or reuse bugs).
+ */
+static void test_elf_image_close_double_close(void** state) {
+    image_test_fs_t* fs = *state;
+
+    // Construct a test file path under the temporary directory
+    char path[512];
+    snprintf(path, sizeof(path), "%s/double_close.bin", fs->temp_path);
+
+    // Write arbitrary test data to the file
+    uint8_t buf[64];
+    memset(buf, 0xAA, sizeof(buf));
+    assert_int_equal(write_file(path, buf, sizeof(buf)), 0);
+
+    elf_image_t img = {0};
+    assert_int_equal(elf_image_open(path, &img), 0);
+
+    // First close must succeed and clear fields
+    assert_int_equal(elf_image_close(&img), 0);
+    assert_null(img.base);
+    assert_int_equal(img.size, 0);
+    assert_null(img.path);
+
+    // Second close must also succeed and leave fields cleared
+    assert_int_equal(elf_image_close(&img), 0);
+    assert_null(img.base);
+    assert_int_equal(img.size, 0);
+    assert_null(img.path);
+}
+
+/*
+ * Verify that elf_image_close() succeeds on an empty (never-opened) image.
+ *
+ * Callers often perform unconditional cleanup in error paths. This test ensures
+ * that closing a zero-initialized elf_image_t is a safe no-op that returns 0
+ * and leaves fields in an empty state.
+ */
+static void test_elf_image_close_empty_image(void** state) {
+    (void)state;  // Unused; no filesystem setup required
+
+    elf_image_t img = {0};
+    assert_int_equal(elf_image_close(&img), 0);
+
+    // Close must leave fields in an empty state
+    assert_null(img.base);
+    assert_int_equal(img.size, 0);
+    assert_null(img.path);
+}
+
+/*
+ * Verify that an elf_image_t can be safely reused across multiple open/close
+ * cycles.
+ *
+ * This test opens and closes two different files sequentially using the same
+ * elf_image_t. Each open must fully reinitialize the structure, and each close
+ * must fully clear it.
+ */
+static void test_elf_image_open_close_reuse(void** state) {
+    image_test_fs_t* fs = *state;
+
+    char path1[512];
+    char path2[512];
+    snprintf(path1, sizeof(path1), "%s/reuse_one.bin", fs->temp_path);
+    snprintf(path2, sizeof(path2), "%s/reuse_two.bin", fs->temp_path);
+
+    // Write different patterns so we can distinguish mappings
+    uint8_t buf1[64];
+    uint8_t buf2[64];
+    memset(buf1, 0xFF, sizeof(buf1));
+    memset(buf2, 0xAA, sizeof(buf2));
+
+    assert_int_equal(write_file(path1, buf1, sizeof(buf1)), 0);
+    assert_int_equal(write_file(path2, buf2, sizeof(buf2)), 0);
+
+    elf_image_t img = {0};
+
+    // First open/close cycle
+    assert_int_equal(elf_image_open(path1, &img), 0);
+    assert_non_null(img.base);
+    assert_int_equal(img.size, sizeof(buf1));
+    assert_ptr_equal(img.path, path1);
+    assert_memory_equal(img.base, buf1, sizeof(buf1));
+
+    assert_int_equal(elf_image_close(&img), 0);
+    assert_null(img.base);
+    assert_int_equal(img.size, 0);
+    assert_null(img.path);
+
+    // Second open/close cycle reusing the same struct
+    assert_int_equal(elf_image_open(path2, &img), 0);
+    assert_non_null(img.base);
+    assert_int_equal(img.size, sizeof(buf2));
+    assert_ptr_equal(img.path, path2);
+    assert_memory_equal(img.base, buf2, sizeof(buf2));
+
+    assert_int_equal(elf_image_close(&img), 0);
+    assert_null(img.base);
+    assert_int_equal(img.size, 0);
+    assert_null(img.path);
+}
+
+/*
  * Verify that elf_image_close() succeeds for a valid, mapped image and clears
  * all fields afterward.
  *
@@ -438,6 +552,13 @@ size_t register_elf_image_tests(struct CMUnitTest** out) {
                                         setup_image_tests,
                                         teardown_image_tests),
         cmocka_unit_test_setup_teardown(test_elf_image_close_img_base_null,
+                                        setup_image_tests,
+                                        teardown_image_tests),
+        cmocka_unit_test_setup_teardown(test_elf_image_close_double_close,
+                                        setup_image_tests,
+                                        teardown_image_tests),
+        cmocka_unit_test(test_elf_image_close_empty_image),
+        cmocka_unit_test_setup_teardown(test_elf_image_open_close_reuse,
                                         setup_image_tests,
                                         teardown_image_tests),
         cmocka_unit_test_setup_teardown(test_elf_image_close_success,
