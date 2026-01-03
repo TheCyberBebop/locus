@@ -92,7 +92,7 @@ int elf_validate_ident(const elf_image_t* img, elf_ident_info_t* out) {
     }
 
 #if LOG_LEVEL <= LOG_LEVEL_ERROR
-    const char path = img->path ? img->path : "(unknown)";  // Not critical
+    const char* path = img->path ? img->path : "(unknown)";  // Not critical
 #endif
 
     /* Size needs at least EI_NIDENT bytes to safely index e_ident fields.

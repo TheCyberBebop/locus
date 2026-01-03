@@ -72,7 +72,7 @@ static inline int validate_read_args(const elf_image_t* img,
     }
 
 #if LOG_LEVEL <= LOG_LEVEL_ERROR
-    const char path = img->path ? img->path : "(unknown)";  // Not critical
+    const char* path = img->path ? img->path : "(unknown)";  // Not critical
 #endif
 
     /* We must know the file endianness to correctly decode multi-byte fields.
