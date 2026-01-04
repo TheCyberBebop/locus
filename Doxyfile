@@ -4,9 +4,9 @@ PROJECT_BRIEF          = "Loader Of Compiled Universal Systems"
 OUTPUT_DIRECTORY       = docs
 
 # --- Inputs (repo layout) ---
-INPUT                  = locus unit_tests/tests.dox
+INPUT                  = locus unit_tests/unit_tests.dox
 RECURSIVE              = YES
-FILE_PATTERNS          = *.c *.h
+FILE_PATTERNS          = *.c *.h *.dox
 
 # Treat C constructs (typedefs, structs, etc.) more naturally.
 OPTIMIZE_OUTPUT_FOR_C  = YES

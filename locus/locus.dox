@@ -1,0 +1,36 @@
+/**
+ * @mainpage LOCUS — Loader Of Compiled Universal Systems
+ *
+ * LOCUS (Loader Of Compiled Universal Systems) is an educational and
+ * research-oriented userspace ELF loader for Linux.
+ *
+ * The project focuses on:
+ * - Understanding how Linux loads ELF binaries
+ * - Manual userspace ELF loading and validation
+ * - ABI behavior across architectures
+ * - Defensive handling of malformed ELF files
+ *
+ * @section locus_navigation Navigation
+ * - @ref elf_image.h "ELF Image Abstraction"
+ * - @ref elf_ident.h "ELF Identification"
+ * - @ref elf_read.h  "Endian-aware ELF Reads"
+ * - @ref locus_tests "Unit Tests"
+ *
+ * @section locus_groups Module Groups
+ * - @ref locus
+ *
+ * @defgroup locus LOCUS ELF Loader
+ * @brief Project-wide documentation group.
+ */
+
+/**
+ * @defgroup locus LOCUS ELF Loader
+ *
+ * LOCUS (Loader Of Compiled Universal Systems) is an educational and
+ * research-oriented userspace ELF loader for Linux.
+ *
+ * This project explores:
+ * - Linux ELF loading semantics
+ * - ABI behavior across architectures
+ * - Defensive parsing of malformed ELF files
+ */

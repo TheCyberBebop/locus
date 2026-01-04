@@ -21,6 +21,8 @@ DOXYGEN      ?= doxygen
 RM             := rm -rf
 ARTIFACTS_DIR  := artifacts
 BUILD_ROOT_DIR := build
+TEST_FILES_DIR := test_files
+UNIT_TESTS_DIR := unit_tests
 BUILD_DIR      := $(BUILD_ROOT_DIR)/$(LOG)
 DOCS_DIR       := docs
 DOXYFILE       := Doxyfile
@@ -101,21 +103,22 @@ CFLAGS_TESTS    := -O0 -g -fno-omit-frame-pointer -MMD -MP
 # LOCUS library sources (everything except the locus entrypoint)
 LOCUS_LIB_SRC := $(filter-out locus/locus.c,$(wildcard locus/*.c))
 LOCUS_APP_SRC := locus/locus.c
-TEST_SRCS     := $(wildcard tests/*.c)
+TEST_SRCS     := $(wildcard $(TEST_FILES_DIR)/*.c)
 # Isolate test file names for building
 TEST_NAMES    := $(notdir $(basename $(TEST_SRCS)))
 
 # -------- Unit tests (cmocka) --------
-UNIT_DIR   := unit_tests
-UNIT_SRCS  := $(wildcard $(UNIT_DIR)/*.c)
-UNIT_BUILD := $(BUILD_DIR)/unit_tests
-UNIT_BIN   := $(UNIT_BUILD)/locus_tests
+UNIT_TEST_SRCS  := $(wildcard $(UNIT_TESTS_DIR)/*.c)
+UNIT_TEST_BUILD := $(BUILD_DIR)/$(UNIT_TESTS_DIR)
+UNIT_TEST_BIN   := $(UNIT_TEST_BUILD)/locus_tests
 
 # Object files for unit tests (native only)
-UNIT_OBJS := $(patsubst $(UNIT_DIR)/%.c,$(UNIT_BUILD)/%.o,$(UNIT_SRCS))
+UNIT_OBJS := \
+	$(patsubst $(UNIT_TESTS_DIR)/%.c,$(UNIT_TEST_BUILD)/%.o,$(UNIT_TEST_SRCS))
 
 # LOCUS objects compiled for unit tests (native compile flags)
-UNIT_LOCUS_OBJS := $(patsubst locus/%.c,$(UNIT_BUILD)/locus/%.o,$(LOCUS_LIB_SRC))
+UNIT_LOCUS_OBJS := \
+	$(patsubst locus/%.c,$(UNIT_TEST_BUILD)/locus/%.o,$(LOCUS_LIB_SRC))
 
 # -------- Toolchains and Architecture Mappings --------
 # Includes host compiler (CC) with no prefix
@@ -180,7 +183,8 @@ $(foreach tc,$(TOOLCHAINS), \
 ifeq ($(strip $(ARCH)),)
 TOOLCHAINS_SELECTED := $(TOOLCHAINS)
 else
-TOOLCHAINS_SELECTED := $(foreach tc,$(TOOLCHAINS),$(if $(filter $(ARCH),$(OUT_$(tc))),$(tc),))
+TOOLCHAINS_SELECTED := \
+	$(foreach tc,$(TOOLCHAINS),$(if $(filter $(ARCH),$(OUT_$(tc))),$(tc),))
 endif
 
 ifeq ($(strip $(ARCH)),)
@@ -193,9 +197,9 @@ endif
 
 # -------- Include all generated dependency (.d) files (from build/) --------
 DEPS := $(wildcard $(BUILD_DIR)/*/locus/*.d) \
-        $(wildcard $(BUILD_DIR)/*/tests/*.d) \
-        $(wildcard $(UNIT_BUILD)/*.d) \
-        $(wildcard $(UNIT_BUILD)/locus/*.d)
+        $(wildcard $(BUILD_DIR)/*/$(TEST_FILES_DIR)/*.d) \
+        $(wildcard $(UNIT_TEST_BUILD)/*.d) \
+        $(wildcard $(UNIT_TEST_BUILD)/locus/*.d)
 -include $(DEPS)
 
 # -------- Macro to generate rules for each toolchain --------
@@ -222,22 +226,24 @@ CC_$(1) := $(1)-gcc
 endif
 
 # locus objects: build/<arch>/locus/<name>.o
-OBJS_$(1) := $$(patsubst locus/%.c,$$(ARCH_BUILD_DIR_$(1))/locus/%.o,$(LOCUS_LIB_SRC) $(LOCUS_APP_SRC))
+OBJS_$(1) := \
+	$$(patsubst locus/%.c,$$(ARCH_BUILD_DIR_$(1))/locus/%.o,$(LOCUS_LIB_SRC) $(LOCUS_APP_SRC))
 
-# Test objects: build/<arch>/tests/<testname>.o
-TEST_OBJS_$(1) := $$(patsubst tests/%.c,$$(ARCH_BUILD_DIR_$(1))/tests/%.o,$(TEST_SRCS))
+# Test objects: build/<arch>/test_files/<testname>.o
+TEST_OBJS_$(1) := \
+	$$(patsubst $(TEST_FILES_DIR)/%.c,$$(ARCH_BUILD_DIR_$(1))/$(TEST_FILES_DIR)/%.o,$(TEST_SRCS))
 
 # ---- Directory rules (order-only) ----
 $$(ARCH_ART_DIR_$(1)): | $(ARTIFACTS_DIR)
 	$(Q)mkdir -p $$@
 
-$$(ARCH_ART_DIR_$(1))/tests: | $$(ARCH_ART_DIR_$(1))
+$$(ARCH_ART_DIR_$(1))/$(TEST_FILES_DIR): | $$(ARCH_ART_DIR_$(1))
 	$(Q)mkdir -p $$@
 
 $$(ARCH_BUILD_DIR_$(1))/locus: | $(BUILD_ROOT_DIR)
 	$(Q)mkdir -p $$@
 
-$$(ARCH_BUILD_DIR_$(1))/tests: | $(BUILD_ROOT_DIR)
+$$(ARCH_BUILD_DIR_$(1))/$(TEST_FILES_DIR): | $(BUILD_ROOT_DIR)
 	$(Q)mkdir -p $$@
 
 # ---- 1) Compile locus .c -> build/<arch>/locus/*.o (+ .d) ----
@@ -255,18 +261,21 @@ $$(ARCH_ART_DIR_$(1))/locus_static: $$(OBJS_$(1)) | $$(ARCH_ART_DIR_$(1))
 	@echo "==> [$$(ARCH_NAME_$(1))] LD $$@ (static)"
 	$(Q)$$(CC_$(1)) -static -o $$@ $$^
 
-# ---- 3) Compile tests .c -> build/<arch>/tests/*.o (+ .d) ----
-$$(ARCH_BUILD_DIR_$(1))/tests/%.o: tests/%.c | $$(ARCH_BUILD_DIR_$(1))/tests
+# ---- 3) Compile test_files .c -> build/<arch>/test_files/*.o (+ .d) ----
+$$(ARCH_BUILD_DIR_$(1))/$(TEST_FILES_DIR)/%.o: \
+	$(TEST_FILES_DIR)/%.c | $$(ARCH_BUILD_DIR_$(1))/$(TEST_FILES_DIR)
 	@echo "==> [$$(ARCH_NAME_$(1))] CC $$<"
 	$(Q)$$(CC_$(1)) $$(CFLAGS_TESTS) -c -o $$@ $$<
 
-# ---- 4a) Link tests -> artifacts/<arch>/tests/<testname> ----
-$$(ARCH_ART_DIR_$(1))/tests/%: $$(ARCH_BUILD_DIR_$(1))/tests/%.o | $$(ARCH_ART_DIR_$(1))/tests
+# ---- 4a) Link test_files -> artifacts/<arch>/test_files/<testname> ----
+$$(ARCH_ART_DIR_$(1))/$(TEST_FILES_DIR)/%: \
+	$$(ARCH_BUILD_DIR_$(1))/$(TEST_FILES_DIR)/%.o | $$(ARCH_ART_DIR_$(1))/$(TEST_FILES_DIR)
 	@echo "==> [$$(ARCH_NAME_$(1))] LD test $$*"
 	$(Q)$$(CC_$(1)) -o $$@ $$<
 
-# ---- 4b) Link static tests -> artifacts/<arch>/tests/<testname>_static ----
-$$(ARCH_ART_DIR_$(1))/tests/%_static: $$(ARCH_BUILD_DIR_$(1))/tests/%.o | $$(ARCH_ART_DIR_$(1))/tests
+# ---- 4b) Link static test_files -> artifacts/<arch>/test_files/<testname>_static ----
+$$(ARCH_ART_DIR_$(1))/$(TEST_FILES_DIR)/%_static: \
+	$$(ARCH_BUILD_DIR_$(1))/$(TEST_FILES_DIR)/%.o | $$(ARCH_ART_DIR_$(1))/$(TEST_FILES_DIR)
 	@echo "==> [$$(ARCH_NAME_$(1))] LD test $$* (static)"
 	$(Q)$$(CC_$(1)) -static -o $$@ $$<
 endef
@@ -281,40 +290,42 @@ $(BUILD_ROOT_DIR):
 	$(Q)mkdir -p $@
 
 # -------- Unit tests (native, cmocka) --------
-$(UNIT_BUILD): | $(BUILD_ROOT_DIR)
+$(UNIT_TEST_BUILD): | $(BUILD_ROOT_DIR)
 	$(Q)mkdir -p $@
 
-$(UNIT_BUILD)/locus: | $(UNIT_BUILD)
+$(UNIT_TEST_BUILD)/locus: | $(UNIT_TEST_BUILD)
 	$(Q)mkdir -p $@
 
 # Compile unit test sources -> build/.../unit_tests/*.o
-$(UNIT_BUILD)/%.o: $(UNIT_DIR)/%.c | $(UNIT_BUILD)
+$(UNIT_TEST_BUILD)/%.o: $(UNIT_TESTS_DIR)/%.c | $(UNIT_TEST_BUILD)
 	@echo "==> [unit] CC $<"
-	$(Q)$(CC_NATIVE) $(CPPFLAGS_COMMON) $(CFLAGS_COMMON) -I$(UNIT_DIR) -c -o $@ $<
+	$(Q)$(CC_NATIVE) $(CPPFLAGS_COMMON) $(CFLAGS_COMMON) -I$(UNIT_TESTS_DIR) -c -o $@ $<
 
 # Compile locus sources for unit tests -> build/.../unit_tests/locus/*.o
-$(UNIT_BUILD)/locus/%.o: locus/%.c | $(UNIT_BUILD)/locus
+$(UNIT_TEST_BUILD)/locus/%.o: locus/%.c | $(UNIT_TEST_BUILD)/locus
 	@echo "==> [unit] CC $<"
-	$(Q)$(CC_NATIVE) $(CPPFLAGS_COMMON) $(CFLAGS_COMMON) -I$(UNIT_DIR) -c -o $@ $<
+	$(Q)$(CC_NATIVE) $(CPPFLAGS_COMMON) $(CFLAGS_COMMON) -I$(UNIT_TESTS_DIR) -c -o $@ $<
 
 # Link unit test runner (links cmocka)
-$(UNIT_BIN): $(UNIT_OBJS) $(UNIT_LOCUS_OBJS) | $(UNIT_BUILD)
+$(UNIT_TEST_BIN): $(UNIT_OBJS) $(UNIT_LOCUS_OBJS) | $(UNIT_TEST_BUILD)
 	@echo "==> [unit] LD $@"
 	$(Q)$(CC_NATIVE) -o $@ $^ -lcmocka
 
 # -------- Build target expansion --------
 ALL_TESTS           := $(foreach tc,$(TOOLCHAINS_SELECTED), \
-                       $(foreach t,$(TEST_NAMES),$(ARTIFACTS_DIR)/$(OUT_$(tc))/tests/$(t)))
+                       $(foreach t,$(TEST_NAMES),$(ARTIFACTS_DIR)/$(OUT_$(tc))/$(TEST_FILES_DIR)/$(t)))
 ALL_TESTS_STATIC    := $(foreach tc,$(TOOLCHAINS_SELECTED), \
-                       $(foreach t,$(TEST_NAMES),$(ARTIFACTS_DIR)/$(OUT_$(tc))/tests/$(t)_static))
+                       $(foreach t,$(TEST_NAMES),$(ARTIFACTS_DIR)/$(OUT_$(tc))/$(TEST_FILES_DIR)/$(t)_static))
 ALL_LOCUS           := $(foreach tc,$(TOOLCHAINS_SELECTED),$(ARTIFACTS_DIR)/$(OUT_$(tc))/locus)
 ALL_LOCUS_STATIC    := $(foreach tc,$(TOOLCHAINS_SELECTED),$(ARTIFACTS_DIR)/$(OUT_$(tc))/locus_static)
-NATIVE_TESTS        := $(foreach t,$(TEST_NAMES),$(ARTIFACTS_DIR)/$(OUT_native)/tests/$(t))
-NATIVE_TESTS_STATIC := $(foreach t,$(TEST_NAMES),$(ARTIFACTS_DIR)/$(OUT_native)/tests/$(t)_static)
+NATIVE_TESTS        := $(foreach t,$(TEST_NAMES),$(ARTIFACTS_DIR)/$(OUT_native)/$(TEST_FILES_DIR)/$(t))
+NATIVE_TESTS_STATIC := $(foreach t,$(TEST_NAMES),$(ARTIFACTS_DIR)/$(OUT_native)/$(TEST_FILES_DIR)/$(t)_static)
 NATIVE_LOCUS        := $(ARTIFACTS_DIR)/$(OUT_native)/locus
 NATIVE_LOCUS_STATIC := $(ARTIFACTS_DIR)/$(OUT_native)/locus_static
 
-all: tests tests_static locus locus_static docs
+all: unit_tests build_all
+
+build_all: tests tests_static locus locus_static docs
 
 native: $(NATIVE_LOCUS) $(NATIVE_TESTS)
 	@echo ""
@@ -346,11 +357,11 @@ locus_static: check-toolchains $(ALL_LOCUS_STATIC)
 	@echo "Finished building static locus binaries."
 	@echo ""
 
-unit_tests: $(UNIT_BIN)
+unit_tests: $(UNIT_TEST_BIN)
 	@echo ""
 	@echo "==> Running unit tests"
 	@echo ""
-	$(Q)$(UNIT_BIN)
+	$(Q)$(UNIT_TEST_BIN)
 	@echo ""
 	@echo "Finished running unit tests."
 	@echo ""

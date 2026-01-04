@@ -1,6 +1,5 @@
 /**
  * @file elf_image.h
- *
  * @brief Read-only ELF file image abstraction.
  *
  * This module defines the lowest-level ELF inspection primitive used by LOCUS.
