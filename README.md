@@ -133,7 +133,7 @@ They are feature and understanding-driven, not time-based.
 ### Core ELF Parsing & Validation
 - [X] Open and validate ELF files
 - [ ] Parse and log ELF headers
-- [ ] Validate ELF class, endianness, and ABI
+- [X] Validate ELF class, endianness, and ABI
 - [ ] Parse and log program headers
 - [ ] Identify loadable segments (PT_LOAD)
 - [ ] Parse and inspect auxiliary program headers (PT_INTERP, PT_DYNAMIC, etc.)
@@ -167,23 +167,23 @@ They are feature and understanding-driven, not time-based.
 - [ ] Investigate loader behavior without filesystem dependencies
 
 ### Cross-Architecture Exploration
-- [ ] Build and inspect ELF binaries for multiple architectures
+- [X] Build and inspect ELF binaries for multiple architectures
 - [ ] Validate architecture-specific ELF differences
-- [ ] Handle endianness variations
+- [X] Handle endianness variations
 - [ ] Compare ABI and calling convention behavior
 
 ### Security & Hardening Experiments
-- [ ] Detect malformed ELF files
+- [X] Detect malformed ELF files
 - [ ] Explore mitigation of malicious ELF constructs
 - [ ] Validate bounds and invariants during loading
 - [ ] Experiment with defensive loading strategies
 
 ### Tooling & Infrastructure
-- [ ] Maintain strict build correctness with GNU Make
-- [ ] Preserve verbose, structured logging
-- [ ] Generate and maintain Doxygen documentation
+- [X] Maintain strict build correctness with GNU Make
+- [X] Preserve verbose, structured logging
+- [X] Generate and maintain Doxygen documentation
 - [ ] Add diagnostic and inspection utilities
-- [ ] Keep the codebase readable and auditable
+- [X] Keep the codebase readable and auditable
 
 ## Disclaimer
 
