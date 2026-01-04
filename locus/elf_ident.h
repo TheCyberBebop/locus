@@ -42,11 +42,11 @@ extern "C" {
  * decode all multi-byte fields according to the file's endianness.
  */
 typedef struct elf_ident_info {
-    uint8_t ei_class;      /**< EI_CLASS: ELFCLASS32 or ELFCLASS64 */
-    uint8_t ei_data;       /**< EI_DATA:  ELFDATA2LSB or ELFDATA2MSB */
-    uint8_t ei_version;    /**< EI_VERSION (expect EV_CURRENT) */
-    uint8_t ei_osabi;      /**< EI_OSABI */
-    uint8_t ei_abiversion; /**< EI_ABIVERSION */
+    uint8_t ei_class;      /**< @c EI_CLASS: ELFCLASS32 or ELFCLASS64. */
+    uint8_t ei_data;       /**< @c EI_DATA: ELFDATA2LSB or ELFDATA2MSB. */
+    uint8_t ei_version;    /**< @c EI_VERSION: expect EV_CURRENT. */
+    uint8_t ei_osabi;      /**< @c EI_OSABI: target OS/ABI identification. */
+    uint8_t ei_abiversion; /**< @c EI_ABIVERSION: ABI version for the OSABI. */
 } elf_ident_info_t;
 
 /**
