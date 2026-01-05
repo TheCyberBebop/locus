@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "elf_ehdr.h"
 #include "elf_ident.h"
 #include "elf_image.h"
 #include "logger.h"
@@ -17,6 +18,7 @@ int main(int argc, char* argv[]) {
     int rc = 0;
     elf_image_t img;
     elf_ident_info_t ident;
+    elf_ehdr_parsed_t ehdr;
 
     TRACE("Entered %s", __func__);
 
@@ -29,6 +31,7 @@ int main(int argc, char* argv[]) {
     DEBUG("path: '%s' passed in", argv[1]);
     memset(&img, 0, sizeof(img));
     memset(&ident, 0, sizeof(ident));
+    memset(&ehdr, 0, sizeof(ehdr));
 
     /* Open and memory-map the ELF file into a read-only image, which will
      * be used for subsequent validation and parsing */
@@ -44,6 +47,15 @@ int main(int argc, char* argv[]) {
     rc = elf_validate_ident(&img, &ident);
     if (rc < 0) {
         ERROR("ELF identification validation failed (%d)", rc);
+        cleanup(&img);
+        return EXIT_FAILURE;
+    }
+
+    /* Parse the remaining ELF header fields and populate the parsed ELF header
+     */
+    rc = elf_ehdr_parse(&img, &ident, &ehdr);
+    if (rc < 0) {
+        ERROR("ELF header parsing failed (%d)", rc);
         cleanup(&img);
         return EXIT_FAILURE;
     }

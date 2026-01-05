@@ -14,6 +14,7 @@
  * - @ref elf_image.h "ELF Image Abstraction"
  * - @ref elf_ident.h "ELF Identification"
  * - @ref elf_read.h  "Endian-aware ELF Reads"
+ * - @ref elf_ehdr "Parse/Validate ELF File Header"
  * - @ref locus_tests "Unit Tests"
  *
  * @section locus_groups Module Groups
