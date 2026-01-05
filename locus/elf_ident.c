@@ -13,7 +13,7 @@ static bool check_magic(const uint8_t* e_ident) {
 }
 
 #if LOG_LEVEL <= LOG_LEVEL_INFO
-static const char* get_class_str(uint8_t class) {
+const char* elf_ident_class_str(uint8_t class) {
     switch (class) {
         case ELFCLASS32:
             return "ELF32";
@@ -24,7 +24,7 @@ static const char* get_class_str(uint8_t class) {
     }
 }
 
-static const char* get_data_str(uint8_t data) {
+const char* elf_ident_data_str(uint8_t data) {
     switch (data) {
         case ELFDATA2LSB:
             return "LSB (little-endian)";
@@ -35,7 +35,7 @@ static const char* get_data_str(uint8_t data) {
     }
 }
 
-static const char* get_osabi_str(uint8_t osabi) {
+const char* elf_ident_osabi_str(uint8_t osabi) {
     switch (osabi) {
         case ELFOSABI_NONE:
             return "SYSV";
@@ -116,7 +116,7 @@ int elf_validate_ident(const elf_image_t* img, elf_ident_info_t* out) {
 
     // Check bitness (32-bit or 64-bit)
     ei_class = ident[EI_CLASS];
-    if (ei_class != ELFCLASS32 && ei_class != ELFCLASS64) {
+    if (ELFCLASS32 != ei_class && ELFCLASS64 != ei_class) {
         ERROR("'%s': unsupported ELF ei_class (%" PRIu8 ")", path, ei_class);
         return -ENOTSUP;
     }
@@ -144,8 +144,8 @@ int elf_validate_ident(const elf_image_t* img, elf_ident_info_t* out) {
 
     INFO("ELF identification: class=%s, data=%s, version=%" PRIu8
          ", osabi=%s (%" PRIu8 "), abiversion=%" PRIu8,
-         get_class_str(out->ei_class), get_data_str(out->ei_data),
-         out->ei_version, get_osabi_str(out->ei_osabi), out->ei_osabi,
+         elf_ident_class_str(out->ei_class), elf_ident_data_str(out->ei_data),
+         out->ei_version, elf_ident_osabi_str(out->ei_osabi), out->ei_osabi,
          out->ei_abiversion);
     TRACE("Finished %s", __func__);
     return 0;

@@ -50,6 +50,47 @@ typedef struct elf_ident_info {
 } elf_ident_info_t;
 
 /**
+ * @brief Convert an ELF EI_CLASS value to a human-readable string.
+ *
+ * This function translates the numeric value from the ELF identification field
+ * @c EI_CLASS into a descriptive string suitable for logging and diagnostics.
+ *
+ * @param ei_class The EI_CLASS value (e.g., ELFCLASS32 or ELFCLASS64).
+ *
+ * @return A constant, human-readable string describing the ELF class.
+ *         Returns a placeholder string for unknown or unsupported values.
+ */
+const char *elf_ident_class_str(uint8_t ei_class);
+
+/**
+ * @brief Convert an ELF EI_DATA value to a human-readable string.
+ *
+ * This function translates the numeric value from the ELF identification field
+ * @c EI_DATA into a descriptive string indicating the byte order (endianness)
+ * of the ELF file.
+ *
+ * @param ei_data The EI_DATA value (e.g., ELFDATA2LSB or ELFDATA2MSB).
+ *
+ * @return A constant, human-readable string describing the ELF data encoding.
+ *         Returns a placeholder string for unknown or unsupported values.
+ */
+const char *elf_ident_data_str(uint8_t ei_data);
+
+/**
+ * @brief Convert an ELF EI_OSABI value to a human-readable string.
+ *
+ * This function translates the numeric value from the ELF identification field
+ * @c EI_OSABI into a descriptive string indicating the target operating system
+ * or ABI.
+ *
+ * @param ei_osabi The EI_OSABI value.
+ *
+ * @return A constant, human-readable string describing the ELF OS/ABI.
+ *         Returns a placeholder string for unknown or reserved values.
+ */
+const char *elf_ident_osabi_str(uint8_t ei_osabi);
+
+/**
  * @brief Validate the ELF identification bytes (e_ident) and populate decoder
  * info.
  *
