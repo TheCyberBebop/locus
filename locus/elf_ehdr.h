@@ -112,6 +112,41 @@ int elf_ehdr_parse(const elf_image_t* img,
                    const elf_ident_info_t* ident,
                    elf_ehdr_parsed_t* out);
 
+/**
+ * @brief Validate ELF header invariants required for safe table access.
+ *
+ * This function performs structural validation of the parsed ELF header to
+ * ensure it is safe to access ELF tables referenced by the header.
+ *
+ * Typical checks include:
+ * - @c e_ehsize matches the expected size for the ELF class
+ * - Program Header Table (PHT) offsets, entry sizes, and counts are valid and
+ *   fit within the file
+ * - Section Header Table (SHT) offsets, entry sizes, and counts are valid and
+ *   fit within the file
+ *
+ * Note:
+ * - ET_REL (relocatable objects) are supported for analysis and future
+ *   section-based object-loading paths.
+ * - ET_REL objects are not treated as directly executable.
+ *
+ * @param img   Opened ELF image (backing file and size information).
+ * @param ehdr  Parsed ELF header to validate.
+ *
+ * @return 0 on success, or a negative errno-style value on validation failure.
+ */
+int elf_ehdr_validate(const elf_image_t* img, const elf_ehdr_parsed_t* ehdr);
+
+/**
+ * @brief Log all parsed ELF header fields in a stable, readable format.
+ *
+ * This function emits a human-readable summary of the ELF header fields,
+ * including identification, core header values, and table metadata.
+ *
+ * @param ehdr Parsed ELF header to log.
+ */
+void elf_ehdr_log(const elf_ehdr_parsed_t* ehdr);
+
 #ifdef __cplusplus
 }
 #endif

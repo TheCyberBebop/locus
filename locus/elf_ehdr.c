@@ -9,6 +9,14 @@
 #include "elf_read.h"
 #include "logger.h"
 
+/* ELF ABI-defined structure sizes (bytes). */
+#define ELF32_EHDR_SIZE 52u
+#define ELF64_EHDR_SIZE 64u
+#define ELF32_PHDR_SIZE 32u
+#define ELF64_PHDR_SIZE 56u
+#define ELF32_SHDR_SIZE 40u
+#define ELF64_SHDR_SIZE 64u
+
 /* ELF header field offsets (absolute, from file start).
  *
  * Intentionally avoids casting the mapped file to Elf{32,64}_Ehdr. Instead,
@@ -65,9 +73,8 @@ int elf_ehdr_parse(const elf_image_t* img,
         return -EINVAL;
     }
 
-#if LOG_LEVEL <= LOG_LEVEL_ERROR
     const char* path = img->path ? img->path : "(unknown)";  // Not critical
-#endif
+    (void)path;
 
     // Verify ident was properly populated and contains supported values
     if (ELFCLASS32 != ident->ei_class && ELFCLASS64 != ident->ei_class) {
@@ -131,28 +138,177 @@ int elf_ehdr_parse(const elf_image_t* img,
         READ_OR_RETURN(elf_read_u16, img, ident, OFF64_E_SHSTRNDX,
                        &out->e_shstrndx);
     } else {
-        ERROR("invalid ELF class: %u", out->ei_class);
+        ERROR("invalid ELF class: %u", ident->ei_class);
         return -EINVAL;
     }
 
-    DEBUG("ELF identification:");
-    DEBUG("  class=%s data=%s osabi=%s (%" PRIu8 ") abiversion=%" PRIu8,
-          elf_ident_class_str(out->ei_class), elf_ident_data_str(out->ei_data),
-          elf_ident_osabi_str(out->ei_osabi), out->ei_osabi,
-          out->ei_abiversion);
-    DEBUG("ELF header:");
-    DEBUG("  type=%" PRIu16 " machine=%" PRIu16 " version=%" PRIu32,
-          out->e_type, out->e_machine, out->e_version);
-    DEBUG("  entry=0x%" PRIx64 " flags=0x%" PRIx32, out->e_entry, out->e_flags);
-    DEBUG("Program header table:");
-    DEBUG("  pfoff=0x%" PRIx64 " phentsize=%" PRIu16 " phnum=%" PRIu16,
-          out->e_phoff, out->e_phentsize, out->e_phnum);
-    DEBUG("Section header table:");
-    DEBUG("  shoff=0x%" PRIx64 " shentsize=%" PRIu16 " shnum=%" PRIu16
-          " shstrndx=%" PRIu16,
-          out->e_shoff, out->e_shentsize, out->e_shnum, out->e_shstrndx);
     TRACE("Finished %s", __func__);
     return 0;
 }
 
 #undef READ_OR_RETURN
+
+/* Overflow-safe check: verifies [offset, offset + num * entsize) fits in file
+ */
+static int range_fits_file(uint64_t file_size,
+                           uint64_t offset,
+                           uint64_t num,
+                           uint64_t entsize) {
+    // Zero entries means an empty table; always valid
+    if (0 == num) {
+        return 0;
+    }
+
+    /* entsize must be non-zero to avoid division by zero and invalid byte
+     * ranges */
+    if (0 == entsize) {
+        return -EINVAL;
+    }
+
+    // Check multiplication overflow: num * entsize
+    if (num > UINT64_MAX / entsize) {
+        return -EINVAL;
+    }
+
+    const uint64_t size = num * entsize;
+
+    // Check addition overflow: offset + (num * entsize)
+    if (offset > UINT64_MAX - size) {
+        return -EINVAL;
+    }
+
+    // Final bounds check against file size
+    if (offset + size > file_size) {
+        return -EINVAL;
+    }
+
+    return 0;
+}
+
+int elf_ehdr_validate(const elf_image_t* img, const elf_ehdr_parsed_t* ehdr) {
+    uint16_t expect_ehsize = 0;
+    uint16_t expect_phentsz = 0;
+    // uint16_t expect_shentsz = 0;
+
+    TRACE("Entered %s", __func__);
+
+    // Validate function parameters
+    if (NULL == img || NULL == ehdr) {
+        ERROR("Invalid parameter (img=%p ehdr=%p)", (void*)img, (void*)ehdr);
+        return -EINVAL;
+    }
+
+    const char* path = img->path ? img->path : "(unknown)";  // Not critical
+    (void)path;
+
+    // 1) Verify e_version (must be EV_CURRENT for valid ELF)
+    if (EV_CURRENT != ehdr->e_version) {
+        ERROR("'%s': invalid e_version (%" PRIu32 ")", path, ehdr->e_version);
+        return -EINVAL;
+    }
+
+    /* 2) Object type policy:
+     * - ET_EXEC / ET_DYN: load-path candidates
+     * - ET_REL: supported for analysis / future section-based object loading
+     */
+    if (ET_REL != ehdr->e_type && ET_EXEC != ehdr->e_type &&
+        ET_DYN != ehdr->e_type) {
+        ERROR("'%s': unsupported e_type (%" PRIu16 ")", path, ehdr->e_type);
+        return -ENOTSUP;
+    }
+
+    // 3) Class-specific expected sizes (ELF ABI constants)
+    if (ELFCLASS32 == ehdr->ei_class) {
+        expect_ehsize = ELF32_EHDR_SIZE;
+        expect_phentsz = ELF32_PHDR_SIZE;
+        // expect_shentsz = ELF32_SHDR_SIZE;
+    } else if (ELFCLASS64 == ehdr->ei_class) {
+        expect_ehsize = ELF64_EHDR_SIZE;
+        expect_phentsz = ELF64_PHDR_SIZE;
+        // expect_shentsz = ELF64_SHDR_SIZE;
+    } else {
+        ERROR("'%s': unsupported ei_class: (%" PRIu8 ")", path, ehdr->ei_class);
+        return -ENOTSUP;
+    }
+
+    // 4) Verify ELF header size matches ABI expectations for the class
+    if (expect_ehsize != ehdr->e_ehsize) {
+        ERROR("e_ehsize mismatch detected: %" PRIu16 ", (expected %" PRIu16 ")",
+              ehdr->e_ehsize, expect_ehsize);
+        return -EINVAL;
+    }
+
+    const uint64_t file_size = (uint64_t)img->size;
+
+    /* 5) Program Header Table (PHT) validation.
+     *
+     * ET_REL commonly has no PHT (e_phnum == 0, e_phoff == 0).
+     * For ET_EXEC/ET_DYN, PHT is typically present, but we keep validation
+     * generic: if phnum == 0, allow it as long as phoff is in-bounds.
+     */
+    if (0 == ehdr->e_phnum) {
+        if (ehdr->e_phoff > file_size) {
+            ERROR(
+                "'%s': e_phoff out of bounds with e_phnum==0: phoff=0x%" PRIx64
+                " size=0x%" PRIx64,
+                path, ehdr->e_phoff, file_size);
+            return -EINVAL;
+        }
+    } else {
+        if (expect_phentsz != ehdr->e_phentsize) {
+            ERROR("e_phentsize mismatch detected: %" PRIu16
+                  ", (expected %" PRIu16 ")",
+                  ehdr->e_phentsize, expect_phentsz);
+            return -EINVAL;
+        }
+
+        if (0 != range_fits_file(file_size, ehdr->e_phoff,
+                                 (uint64_t)ehdr->e_phnum,
+                                 (uint64_t)ehdr->e_phentsize)) {
+            ERROR(
+                "'%s': program header table exceeds file bounds "
+                "(phoff=0x%" PRIx64 " phnum=%" PRIu16 " phentsize=%" PRIu16
+                " size=0x%" PRIx64 ")",
+                path, ehdr->e_phoff, ehdr->e_phnum, ehdr->e_phentsize,
+                file_size);
+            return -EINVAL;
+        }
+    }
+
+    /* 6) Section Header Table (SHT) validation */
+
+    // TODO
+
+    TRACE("Finished %s", __func__);
+    return 0;
+}
+
+/* Helper function for printing ELF addresses/offsets with leading zeros. */
+static inline int elf_addr_width(uint8_t ei_class) {
+    return (ei_class == ELFCLASS32) ? 8 : 16;
+}
+
+void elf_ehdr_log(const elf_ehdr_parsed_t* ehdr) {
+    TRACE("Entered %s", __func__);
+    if (NULL != ehdr) {
+        const int width = elf_addr_width(ehdr->ei_class);
+        (void)width;
+
+        INFO("ELF header:");
+        INFO("  ident: class=%s data=%s osabi=%s abiversion=%" PRIu8,
+             elf_ident_class_str(ehdr->ei_class),
+             elf_ident_data_str(ehdr->ei_data),
+             elf_ident_osabi_str(ehdr->ei_osabi), ehdr->ei_abiversion);
+        INFO("  type=%" PRIu16 " machine=%" PRIu16 " version=%" PRIu32,
+             ehdr->e_type, ehdr->e_machine, ehdr->e_version);
+        INFO("  entry=0x%0*" PRIx64 " phoff=0x%0*" PRIx64 " shoff=0x%0*" PRIx64,
+             width, ehdr->e_entry, width, ehdr->e_phoff, width, ehdr->e_shoff);
+        INFO("  flags=0x%" PRIx32 " ehsize=%" PRIu16, ehdr->e_flags,
+             ehdr->e_ehsize);
+        INFO("  phentsize=%" PRIu16 " phnum=%" PRIu16, ehdr->e_phentsize,
+             ehdr->e_phnum);
+        INFO("  shentsize=%" PRIu16 " shnum=%" PRIu16 " shstrndx=%" PRIu16,
+             ehdr->e_shentsize, ehdr->e_shnum, ehdr->e_shstrndx);
+    }
+    TRACE("Finished %s", __func__);
+}

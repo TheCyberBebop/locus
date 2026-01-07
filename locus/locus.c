@@ -7,13 +7,6 @@
 #include "elf_image.h"
 #include "logger.h"
 
-static void cleanup(elf_image_t* img) {
-    int rc = elf_image_close(img);
-    if (rc < 0) {
-        ERROR("failed to close ELF image (%d)", rc);
-    }
-}
-
 int main(int argc, char* argv[]) {
     int rc = 0;
     elf_image_t img;
@@ -38,7 +31,7 @@ int main(int argc, char* argv[]) {
     rc = elf_image_open(argv[1], &img);
     if (rc < 0) {
         ERROR("failed to open ELF image (%d)", rc);
-        return EXIT_FAILURE;
+        goto cleanup;
     }
 
     /* Validate the ELF identification fields (e_ident) and populate the
@@ -47,8 +40,7 @@ int main(int argc, char* argv[]) {
     rc = elf_validate_ident(&img, &ident);
     if (rc < 0) {
         ERROR("ELF identification validation failed (%d)", rc);
-        cleanup(&img);
-        return EXIT_FAILURE;
+        goto cleanup;
     }
 
     /* Parse the remaining ELF header fields and populate the parsed ELF header
@@ -56,14 +48,25 @@ int main(int argc, char* argv[]) {
     rc = elf_ehdr_parse(&img, &ident, &ehdr);
     if (rc < 0) {
         ERROR("ELF header parsing failed (%d)", rc);
-        cleanup(&img);
-        return EXIT_FAILURE;
+        goto cleanup;
     }
 
+    /* Validate invariants before trusting offsets/counts for table walking. */
+    rc = elf_ehdr_validate(&img, &ehdr);
+    if (rc < 0) {
+        ERROR("ELF header validation failed (%d)", rc);
+        goto cleanup;
+    } else {
+        elf_ehdr_log(&ehdr);
+    }
+
+cleanup:
     /* Release the memory mapping associated with an ELF image previously
      * opened with elf_image_open() and reset the elf_image_t structure
      * to an empty state */
-    cleanup(&img);
+    if (0 != elf_image_close(&img)) {
+        ERROR("failed to close ELF image (%d)", rc);
+    }
 
     TRACE("Finished %s", __func__);
     return EXIT_SUCCESS;
