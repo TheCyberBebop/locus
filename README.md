@@ -21,7 +21,8 @@ The goals of LOCUS are to:
 
 - Understand the ELF loading process in depth
 - Reproduce, step by step, what the Linux kernel loader does
-- Explore ELF behavior across multiple architectures and ABIs
+- Explore ELF behavior across multiple architectures and Application Binary
+  Interfaces (ABIs)
 - Experiment with in-memory loading techniques
 - Investigate ways to detect or mitigate malicious or malformed ELF loading
 - Build tooling that is transparent, verbose, and inspectable
@@ -173,7 +174,7 @@ They are feature and understanding-driven, not time-based.
 - [ ] Compare ABI and calling convention behavior
 
 ### Security & Hardening Experiments
-- [X] Detect malformed ELF files
+- [X] Detect structurally malformed ELF files
 - [ ] Explore mitigation of malicious ELF constructs
 - [ ] Validate bounds and invariants during loading
 - [ ] Experiment with defensive loading strategies
