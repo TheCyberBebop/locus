@@ -91,9 +91,8 @@ int elf_validate_ident(const elf_image_t* img, elf_ident_info_t* out) {
         return -EINVAL;
     }
 
-#if LOG_LEVEL <= LOG_LEVEL_ERROR
     const char* path = img->path ? img->path : "(unknown)";  // Not critical
-#endif
+    (void)path;
 
     /* Size needs at least EI_NIDENT bytes to safely index e_ident fields.
      * Handles elf_image_t->size == 0 as well. */
@@ -142,8 +141,9 @@ int elf_validate_ident(const elf_image_t* img, elf_ident_info_t* out) {
     out->ei_osabi = ident[EI_OSABI];
     out->ei_abiversion = ident[EI_ABIVERSION];
 
-    INFO("ELF identification: class=%s, data=%s, version=%" PRIu8
-         ", osabi=%s (%" PRIu8 "), abiversion=%" PRIu8,
+    INFO("ELF header:");
+    INFO("  ident: class=%s, data=%s, version=%" PRIu8 ", osabi=%s (%" PRIu8
+         "), abiversion=%" PRIu8,
          elf_ident_class_str(out->ei_class), elf_ident_data_str(out->ei_data),
          out->ei_version, elf_ident_osabi_str(out->ei_osabi), out->ei_osabi,
          out->ei_abiversion);

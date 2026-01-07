@@ -100,9 +100,8 @@ int elf_image_close(elf_image_t* img) {
         return -EINVAL;
     }
 
-#if LOG_LEVEL <= LOG_LEVEL_ERROR
     const char* path = img->path ? img->path : "(unknown)";  // Not critical
-#endif
+    (void)path;
 
     /* If the image is currently mapped, unmap it and reset the structure.
      * This function is safe to call multiple times on the same elf_image_t. */

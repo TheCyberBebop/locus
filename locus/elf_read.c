@@ -71,9 +71,8 @@ static inline int validate_read_args(const elf_image_t* img,
         return -EINVAL;
     }
 
-#if LOG_LEVEL <= LOG_LEVEL_ERROR
     const char* path = img->path ? img->path : "(unknown)";  // Not critical
-#endif
+    (void)path;
 
     /* We must know the file endianness to correctly decode multi-byte fields.
      * elf_ident validated EI_DATA, but we defensively re-check here so these
