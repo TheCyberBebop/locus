@@ -133,7 +133,7 @@ They are feature and understanding-driven, not time-based.
 
 ### Core ELF Parsing & Validation
 - [X] Open and validate ELF files
-- [ ] Parse and log ELF headers
+- [X] Parse and log ELF headers
 - [X] Validate ELF class, endianness, and ABI
 - [ ] Parse and log program headers
 - [ ] Identify loadable segments (PT_LOAD)

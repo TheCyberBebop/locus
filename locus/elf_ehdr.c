@@ -1,5 +1,6 @@
 #include <errno.h>
 #include <inttypes.h>
+#include <stdbool.h>
 #include <stdint.h>
 #include <string.h>
 
@@ -16,6 +17,10 @@
 #define ELF64_PHDR_SIZE 56u
 #define ELF32_SHDR_SIZE 40u
 #define ELF64_SHDR_SIZE 64u
+#define ELF32_SH_SIZE_OFFSET 20u
+#define ELF64_SH_SIZE_OFFSET 32u
+#define ELF32_SH_LINK_OFFSET 24u
+#define ELF64_SH_LINK_OFFSET 40u
 
 /* ELF header field offsets (absolute, from file start).
  *
@@ -90,7 +95,7 @@ int elf_ehdr_parse(const elf_image_t* img,
 
     memset(out, 0, sizeof(*out));
 
-    // Copy previously e_ident-derived decoder configuration (elf_ident.c)
+    // Copy previously e_ident-derived identoder configuration (elf_ident.c)
     out->ei_class = ident->ei_class;
     out->ei_data = ident->ei_data;
     out->ei_osabi = ident->ei_osabi;
@@ -102,7 +107,7 @@ int elf_ehdr_parse(const elf_image_t* img,
 
     if (ELFCLASS32 == ident->ei_class) {
         /* Zero-extended 32-bit results from e_entry, e_phoff, and e_shoff to
-         * the appropriate elf_ehdr_parsed_t 64-bit fields */
+         * the appropriate elf_ehdr_parsed_t 64-bit fields. */
         uint32_t temp_u32 = 0;
         READ_OR_RETURN(elf_read_u32, img, ident, OFF_E_ENTRY, &temp_u32);
         out->e_entry = (uint64_t)temp_u32;
@@ -138,7 +143,7 @@ int elf_ehdr_parse(const elf_image_t* img,
         READ_OR_RETURN(elf_read_u16, img, ident, OFF64_E_SHSTRNDX,
                        &out->e_shstrndx);
     } else {
-        ERROR("invalid ELF class: %u", ident->ei_class);
+        ERROR("'%s': invalid ELF class: %" PRIu8, path, ident->ei_class);
         return -EINVAL;
     }
 
@@ -148,19 +153,22 @@ int elf_ehdr_parse(const elf_image_t* img,
 
 #undef READ_OR_RETURN
 
-/* Overflow-safe check: verifies [offset, offset + num * entsize) fits in file
+/* Overflow-safe check: verifies [offset, offset + num * entsize) fits in file.
  */
-static int range_fits_file(uint64_t file_size,
-                           uint64_t offset,
-                           uint64_t num,
-                           uint64_t entsize) {
+static int byte_range_fits_file(uint64_t file_size,
+                                uint64_t offset,
+                                uint64_t num,
+                                uint64_t entsize) {
+    TRACE("Entered %s", __func__);
+
     // Zero entries means an empty table; always valid
     if (0 == num) {
+        TRACE("Finished %s", __func__);
         return 0;
     }
 
     /* entsize must be non-zero to avoid division by zero and invalid byte
-     * ranges */
+     * ranges. */
     if (0 == entsize) {
         return -EINVAL;
     }
@@ -182,13 +190,170 @@ static int range_fits_file(uint64_t file_size,
         return -EINVAL;
     }
 
+    TRACE("Finished %s", __func__);
+    return 0;
+}
+
+/* Resolve extended section numbering (SHN_XINDEX) if indicated by the ELF
+ * header.
+ *
+ * ELF may use "extended section numbering" when 16-bit fields in the ELF header
+ * are insufficient:
+ * - If e_shnum == 0, the real section count may be stored in SHDR[0].sh_size.
+ * - If e_shstrndx == SHN_XINDEX, the real shstrndx may be stored in
+ *   SHDR[0].sh_link.
+ *
+ * NOTE: e_shnum == 0 is also used by some ET_EXEC/ET_DYN binaries to indicate
+ * "no section header table". This helper only attempts extended resolution when
+ * the header indicates it (via the sentinel values) and the SHT is present.
+ *
+ * On success, returns effective values to use for subsequent validation. This
+ * function does not modify *ehdr.
+ */
+static int resolve_extended_section_numbering(const elf_image_t* img,
+                                              const elf_ehdr_parsed_t* ehdr,
+                                              uint64_t* effective_shnum,
+                                              uint64_t* effective_shstrndx,
+                                              uint16_t expected_shentsize) {
+    TRACE("Entered %s", __func__);
+
+    // Validate function parameters
+    if (NULL == img || NULL == ehdr || NULL == effective_shnum ||
+        NULL == effective_shstrndx) {
+        return -EINVAL;
+    }
+
+    int rc = 0;
+    uint64_t shnum_ext = (uint64_t)ehdr->e_shnum;
+    uint64_t shstrndx_ext = (uint64_t)ehdr->e_shstrndx;
+    const uint64_t file_size = (uint64_t)img->size;
+    const bool need_ext_shnum = (0 == ehdr->e_shnum);
+    const bool need_ext_shstrndx = (SHN_XINDEX == ehdr->e_shstrndx);
+    const char* path = (img->path != NULL) ? img->path : "(unknown)";
+    (void)path;
+
+    // Header contains the effective values directly; so return success
+    if (false == need_ext_shnum && false == need_ext_shstrndx) {
+        *effective_shnum = shnum_ext;
+        *effective_shstrndx = shstrndx_ext;
+        TRACE("Finished %s", __func__);
+        return 0;
+    }
+
+    /* Extended section header numbering (validated before this) requires the
+     * section header table to exist so we can read SHDR[0]. */
+    if (0 == ehdr->e_shoff) {
+        ERROR("Extended section header numbering identified, but e_shoff==0");
+        return -EINVAL;
+    }
+
+    /* e_shentsize must match the class ABI size; otherwise we can't locate
+     * fields reliably. */
+    if (expected_shentsize != ehdr->e_shentsize) {
+        ERROR("'%s': e_shentsize mismatch detected: %" PRIu16
+              ", (expected %" PRIu16 ")",
+              path, ehdr->e_shentsize, expected_shentsize);
+        return -EINVAL;
+    }
+
+    // Ensure SHDR[0] fits in file
+    if (0 != byte_range_fits_file(file_size, ehdr->e_shoff, 1,
+                                  (uint64_t)expected_shentsize)) {
+        ERROR("'%s': SHDR[0] does not fit in file (shoff=0x%" PRIx64
+              " shentsize=%" PRIu16 ")",
+              path, ehdr->e_shoff, expected_shentsize);
+        return -EINVAL;
+    }
+
+    /* Build a minimal decoder config for elf_read_u*().
+     * NOTE: Currently only ei_data is the only field required. */
+    elf_ident_info_t ident;
+    memset(&ident, 0, sizeof(ident));
+    ident.ei_class = ehdr->ei_class;
+    ident.ei_data = ehdr->ei_data;
+    ident.ei_osabi = ehdr->ei_osabi;
+    ident.ei_abiversion = ehdr->ei_abiversion;
+
+    if (ELFCLASS32 == ehdr->ei_class) {
+        uint32_t v32 = 0;
+
+        if (need_ext_shnum) {
+            uint64_t off = ehdr->e_shoff + ELF32_SH_SIZE_OFFSET;
+
+            if (off > (uint64_t)SIZE_MAX) {
+                ERROR(
+                    "'%s': section header offset overflows size_t: 0x%" PRIx64,
+                    path, off);
+                return -EOVERFLOW;
+            }
+
+            // Real section count stored in SHDR[0].sh_size
+            rc = elf_read_u32(img, &ident, (size_t)off, &v32);
+            if (0 != rc) {
+                return rc;
+            }
+            shnum_ext = (uint64_t)v32;
+        }
+
+        if (need_ext_shstrndx) {
+            // Real shstrndx stored in SHDR[0].sh_link
+            rc = elf_read_u32(img, &ident,
+                              (size_t)(ehdr->e_shoff + ELF32_SH_LINK_OFFSET),
+                              &v32);
+            if (0 != rc) {
+                return rc;
+            }
+            shstrndx_ext = (uint64_t)v32;
+        }
+    } else if (ELFCLASS64 == ehdr->ei_class) {
+        if (need_ext_shnum) {
+            uint64_t v64 = 0;
+            uint64_t off = ehdr->e_shoff + ELF64_SH_SIZE_OFFSET;
+
+            if (off > (uint64_t)SIZE_MAX) {
+                ERROR(
+                    "'%s': section header offset overflows size_t: 0x%" PRIx64,
+                    path, off);
+                return -EOVERFLOW;
+            }
+
+            // Real section count stored in SHDR[0].sh_size
+            rc = elf_read_u64(img, &ident, (size_t)off, &v64);
+            if (0 != rc) {
+                return rc;
+            }
+            shnum_ext = v64;
+        }
+
+        if (need_ext_shstrndx) {
+            uint32_t v32 = 0;
+
+            // Real shstrndx stored in SHDR[0].sh_link
+            rc = elf_read_u32(img, &ident,
+                              (size_t)(ehdr->e_shoff + ELF64_SH_LINK_OFFSET),
+                              &v32);
+            if (0 != rc) {
+                return rc;
+            }
+            shstrndx_ext = (uint64_t)v32;
+        }
+    } else {
+        ERROR("'%s': invalid ELF class: %" PRIu8, path, ehdr->ei_class);
+        return -EINVAL;
+    }
+
+    *effective_shnum = shnum_ext;
+    *effective_shstrndx = shstrndx_ext;
+    TRACE("Finished %s", __func__);
     return 0;
 }
 
 int elf_ehdr_validate(const elf_image_t* img, const elf_ehdr_parsed_t* ehdr) {
-    uint16_t expect_ehsize = 0;
-    uint16_t expect_phentsz = 0;
-    // uint16_t expect_shentsz = 0;
+    uint16_t expected_ehsize = 0;
+    uint16_t expected_phentsize = 0;
+    uint16_t expected_shentsize = 0;
+    uint64_t shnum_ext = 0;
+    uint64_t shstrndx_ext = 0;
 
     TRACE("Entered %s", __func__);
 
@@ -219,22 +384,23 @@ int elf_ehdr_validate(const elf_image_t* img, const elf_ehdr_parsed_t* ehdr) {
 
     // 3) Class-specific expected sizes (ELF ABI constants)
     if (ELFCLASS32 == ehdr->ei_class) {
-        expect_ehsize = ELF32_EHDR_SIZE;
-        expect_phentsz = ELF32_PHDR_SIZE;
-        // expect_shentsz = ELF32_SHDR_SIZE;
+        expected_ehsize = ELF32_EHDR_SIZE;
+        expected_phentsize = ELF32_PHDR_SIZE;
+        expected_shentsize = ELF32_SHDR_SIZE;
     } else if (ELFCLASS64 == ehdr->ei_class) {
-        expect_ehsize = ELF64_EHDR_SIZE;
-        expect_phentsz = ELF64_PHDR_SIZE;
-        // expect_shentsz = ELF64_SHDR_SIZE;
+        expected_ehsize = ELF64_EHDR_SIZE;
+        expected_phentsize = ELF64_PHDR_SIZE;
+        expected_shentsize = ELF64_SHDR_SIZE;
     } else {
         ERROR("'%s': unsupported ei_class: (%" PRIu8 ")", path, ehdr->ei_class);
         return -ENOTSUP;
     }
 
     // 4) Verify ELF header size matches ABI expectations for the class
-    if (expect_ehsize != ehdr->e_ehsize) {
-        ERROR("e_ehsize mismatch detected: %" PRIu16 ", (expected %" PRIu16 ")",
-              ehdr->e_ehsize, expect_ehsize);
+    if (expected_ehsize != ehdr->e_ehsize) {
+        ERROR("'%s': e_ehsize mismatch detected: %" PRIu16
+              ", (expected %" PRIu16 ")",
+              path, ehdr->e_ehsize, expected_ehsize);
         return -EINVAL;
     }
 
@@ -255,16 +421,16 @@ int elf_ehdr_validate(const elf_image_t* img, const elf_ehdr_parsed_t* ehdr) {
             return -EINVAL;
         }
     } else {
-        if (expect_phentsz != ehdr->e_phentsize) {
-            ERROR("e_phentsize mismatch detected: %" PRIu16
+        if (expected_phentsize != ehdr->e_phentsize) {
+            ERROR("'%s': e_phentsize mismatch detected: %" PRIu16
                   ", (expected %" PRIu16 ")",
-                  ehdr->e_phentsize, expect_phentsz);
+                  path, ehdr->e_phentsize, expected_phentsize);
             return -EINVAL;
         }
 
-        if (0 != range_fits_file(file_size, ehdr->e_phoff,
-                                 (uint64_t)ehdr->e_phnum,
-                                 (uint64_t)ehdr->e_phentsize)) {
+        if (0 != byte_range_fits_file(file_size, ehdr->e_phoff,
+                                      (uint64_t)ehdr->e_phnum,
+                                      (uint64_t)ehdr->e_phentsize)) {
             ERROR(
                 "'%s': program header table exceeds file bounds "
                 "(phoff=0x%" PRIx64 " phnum=%" PRIu16 " phentsize=%" PRIu16
@@ -275,9 +441,60 @@ int elf_ehdr_validate(const elf_image_t* img, const elf_ehdr_parsed_t* ehdr) {
         }
     }
 
-    /* 6) Section Header Table (SHT) validation */
+    /* 6) Section Header Table (SHT) validation + SHN_XINDEX support
+     *
+     * e_shnum == 0 can mean:
+     * - no SHT present (common in stripped ET_EXEC/ET_DYN)
+     * - extended section numbering (real values stored in SHDR[0])
+     *
+     * First, resolve effective values first, then validate spans/indexes.
+     */
+    int rc = resolve_extended_section_numbering(
+        img, ehdr, &shnum_ext, &shstrndx_ext, expected_shentsize);
+    if (0 != rc) {
+        ERROR("'%s': failed to resolve extended section numbering (%d)", path,
+              rc);
+        return rc;
+    }
 
-    // TODO
+    if (0 == shnum_ext) {
+        /* No section header table (or truly zero). This is legal for
+         * executables/shared objects. For ET_REL, section headers are normally
+         * required. */
+        if (ehdr->e_shoff > file_size) {
+            ERROR(
+                "'%s': e_shoff out of bounds with shnum_ext==0: "
+                "shoff=0x%" PRIx64 " size=0x%" PRIx64,
+                path, ehdr->e_shoff, file_size);
+            return -EINVAL;
+        }
+    } else {
+        if (ehdr->e_shentsize != expected_shentsize) {
+            ERROR("'%s': e_shentsize mismatch detected: %" PRIu16
+                  ", (expected %" PRIu16 ")",
+                  path, ehdr->e_shentsize, expected_shentsize);
+            return -EINVAL;
+        }
+
+        if (byte_range_fits_file(file_size, ehdr->e_shoff, shnum_ext,
+                                 (uint64_t)ehdr->e_shentsize) < 0) {
+            ERROR(
+                "'%s': section header table exceeds file bounds "
+                "(shoff=0x%" PRIx64 " shnum=%" PRIu64 " shentsize=%" PRIu16
+                " size=0x%" PRIx64 ")",
+                path, ehdr->e_shoff, shnum_ext, ehdr->e_shentsize, file_size);
+            return -EINVAL;
+        }
+
+        /* If a section-name string table is specified (non-zero), it must refer
+         * to a valid section header index. */
+        if (0 != shstrndx_ext && shstrndx_ext >= shnum_ext) {
+            ERROR("'%s': e_shstrndx out of range: %" PRIu64 " (shnum=%" PRIu64
+                  ")",
+                  path, shstrndx_ext, shnum_ext);
+            return -EINVAL;
+        }
+    }
 
     TRACE("Finished %s", __func__);
     return 0;
@@ -309,6 +526,12 @@ void elf_ehdr_log(const elf_ehdr_parsed_t* ehdr) {
              ehdr->e_phnum);
         INFO("  shentsize=%" PRIu16 " shnum=%" PRIu16 " shstrndx=%" PRIu16,
              ehdr->e_shentsize, ehdr->e_shnum, ehdr->e_shstrndx);
+
+        if (0 == ehdr->e_shnum || SHN_XINDEX == ehdr->e_shstrndx) {
+            INFO(
+                "  note: extended section numbering indicated (real values "
+                "stored in section header 0)");
+        }
     }
     TRACE("Finished %s", __func__);
 }
