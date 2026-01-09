@@ -88,6 +88,16 @@ int elf_read_u64(const elf_image_t* img,
                  size_t offset,
                  uint64_t* out);
 
+/* Helper macro: call elf_read_* and return on failure. Scoped to this file
+ * only; undefined after use. */
+#define READ_OR_RETURN(fn, img, ident, off, dst)      \
+    do {                                              \
+        int _rc = (fn)((img), (ident), (off), (dst)); \
+        if (_rc != 0) {                               \
+            return _rc;                               \
+        }                                             \
+    } while (0)
+
 #ifdef __cplusplus
 }
 #endif

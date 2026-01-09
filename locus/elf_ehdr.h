@@ -62,7 +62,7 @@ extern "C" {
  * variants. When parsing an ELF32 header, the 32-bit values are zero-extended
  * into these 64-bit fields.
  */
-typedef struct elf_ehdr_parsed {
+typedef struct elf_ehdr {
     /** @name Values derived from e_ident[] (decoder configuration) */
     /**@{*/
     uint8_t ei_class;      /**< @c EI_CLASS: ELFCLASS32 or ELFCLASS64. */
@@ -89,7 +89,7 @@ typedef struct elf_ehdr_parsed {
     uint16_t e_shstrndx;  /**< Section header index of the section-name string
                              table. */
     /**@}*/
-} elf_ehdr_parsed_t;
+} elf_ehdr_t;
 
 /**
  * @brief Parse the ELF header (after e_ident) into a class-neutral
@@ -110,7 +110,7 @@ typedef struct elf_ehdr_parsed {
  */
 int elf_ehdr_parse(const elf_image_t* img,
                    const elf_ident_info_t* ident,
-                   elf_ehdr_parsed_t* out);
+                   elf_ehdr_t* out);
 
 /**
  * @brief Validate ELF header invariants required for safe table access.
@@ -135,7 +135,7 @@ int elf_ehdr_parse(const elf_image_t* img,
  *
  * @return 0 on success, or a negative errno-style value on validation failure.
  */
-int elf_ehdr_validate(const elf_image_t* img, const elf_ehdr_parsed_t* ehdr);
+int elf_ehdr_validate(const elf_image_t* img, const elf_ehdr_t* ehdr);
 
 /**
  * @brief Log all parsed ELF header fields in a stable, readable format.
@@ -145,7 +145,7 @@ int elf_ehdr_validate(const elf_image_t* img, const elf_ehdr_parsed_t* ehdr);
  *
  * @param ehdr Parsed ELF header to log.
  */
-void elf_ehdr_log(const elf_ehdr_parsed_t* ehdr);
+void elf_ehdr_log(const elf_ehdr_t* ehdr);
 
 #ifdef __cplusplus
 }

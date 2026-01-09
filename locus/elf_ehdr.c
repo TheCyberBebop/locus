@@ -56,19 +56,9 @@ enum {
     OFF64_E_SHSTRNDX = 0x3E,
 };
 
-/* Helper macro: call elf_read_* and return on failure. Scoped to this file
- * only; undefined after use. */
-#define READ_OR_RETURN(fn, img, ident, off, dst)      \
-    do {                                              \
-        int _rc = (fn)((img), (ident), (off), (dst)); \
-        if (_rc != 0) {                               \
-            return _rc;                               \
-        }                                             \
-    } while (0)
-
 int elf_ehdr_parse(const elf_image_t* img,
                    const elf_ident_info_t* ident,
-                   elf_ehdr_parsed_t* out) {
+                   elf_ehdr_t* out) {
     TRACE("Entered %s", __func__);
 
     // Validate function parameters
@@ -107,7 +97,7 @@ int elf_ehdr_parse(const elf_image_t* img,
 
     if (ELFCLASS32 == ident->ei_class) {
         /* Zero-extended 32-bit results from e_entry, e_phoff, and e_shoff to
-         * the appropriate elf_ehdr_parsed_t 64-bit fields. */
+         * the appropriate elf_ehdr_t 64-bit fields. */
         uint32_t temp_u32 = 0;
         READ_OR_RETURN(elf_read_u32, img, ident, OFF_E_ENTRY, &temp_u32);
         out->e_entry = (uint64_t)temp_u32;
@@ -150,8 +140,6 @@ int elf_ehdr_parse(const elf_image_t* img,
     TRACE("Finished %s", __func__);
     return 0;
 }
-
-#undef READ_OR_RETURN
 
 /* Overflow-safe check: verifies [offset, offset + num * entsize) fits in file.
  */
@@ -211,7 +199,7 @@ static int byte_range_fits_file(uint64_t file_size,
  * function does not modify *ehdr.
  */
 static int resolve_extended_section_numbering(const elf_image_t* img,
-                                              const elf_ehdr_parsed_t* ehdr,
+                                              const elf_ehdr_t* ehdr,
                                               uint64_t* effective_shnum,
                                               uint64_t* effective_shstrndx,
                                               uint16_t expected_shentsize) {
@@ -348,7 +336,7 @@ static int resolve_extended_section_numbering(const elf_image_t* img,
     return 0;
 }
 
-int elf_ehdr_validate(const elf_image_t* img, const elf_ehdr_parsed_t* ehdr) {
+int elf_ehdr_validate(const elf_image_t* img, const elf_ehdr_t* ehdr) {
     uint16_t expected_ehsize = 0;
     uint16_t expected_phentsize = 0;
     uint16_t expected_shentsize = 0;
@@ -505,7 +493,7 @@ static inline int elf_addr_width(uint8_t ei_class) {
     return (ei_class == ELFCLASS32) ? 8 : 16;
 }
 
-void elf_ehdr_log(const elf_ehdr_parsed_t* ehdr) {
+void elf_ehdr_log(const elf_ehdr_t* ehdr) {
     TRACE("Entered %s", __func__);
     if (NULL != ehdr) {
         const int width = elf_addr_width(ehdr->ei_class);

@@ -11,7 +11,7 @@ int main(int argc, char* argv[]) {
     int rc = 0;
     elf_image_t img;
     elf_ident_info_t ident;
-    elf_ehdr_parsed_t ehdr;
+    elf_ehdr_t ehdr;
 
     TRACE("Entered %s", __func__);
 
