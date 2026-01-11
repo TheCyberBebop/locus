@@ -19,6 +19,12 @@ typedef struct elf_phdr_t {
     uint64_t p_align;
 } elf_phdr_t;
 
+/* TODO */
+typedef struct elf_pht {
+    elf_phdr_t* pheaders;
+    size_t count;
+} elf_pht_t;
+
 #ifdef __cplusplus
 }
 #endif
