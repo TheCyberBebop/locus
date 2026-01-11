@@ -54,7 +54,7 @@ static inline uint64_t bswap64(uint64_t value) {
 }
 
 static inline int validate_read_args(const elf_image_t* img,
-                                     const elf_ident_info_t* ident,
+                                     const elf_ident_t* ident,
                                      void* out,
                                      size_t offset,
                                      size_t width) {
@@ -97,7 +97,7 @@ static inline int validate_read_args(const elf_image_t* img,
 }
 
 int elf_read_u16(const elf_image_t* img,
-                 const elf_ident_info_t* ident,
+                 const elf_ident_t* ident,
                  size_t offset,
                  uint16_t* out) {
     int ret = 0;
@@ -132,7 +132,7 @@ int elf_read_u16(const elf_image_t* img,
 }
 
 int elf_read_u32(const elf_image_t* img,
-                 const elf_ident_info_t* ident,
+                 const elf_ident_t* ident,
                  size_t offset,
                  uint32_t* out) {
     int ret = 0;
@@ -167,7 +167,7 @@ int elf_read_u32(const elf_image_t* img,
 }
 
 int elf_read_u64(const elf_image_t* img,
-                 const elf_ident_info_t* ident,
+                 const elf_ident_t* ident,
                  size_t offset,
                  uint64_t* out) {
     int ret = 0;

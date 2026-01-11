@@ -11,12 +11,6 @@
 #include "logger.h"
 
 /* ELF ABI-defined structure sizes (bytes). */
-#define ELF32_EHDR_SIZE 52u
-#define ELF64_EHDR_SIZE 64u
-#define ELF32_PHDR_SIZE 32u
-#define ELF64_PHDR_SIZE 56u
-#define ELF32_SHDR_SIZE 40u
-#define ELF64_SHDR_SIZE 64u
 #define ELF32_SH_SIZE_OFFSET 20u
 #define ELF64_SH_SIZE_OFFSET 32u
 #define ELF32_SH_LINK_OFFSET 24u
@@ -57,7 +51,7 @@ enum {
 };
 
 int elf_ehdr_parse(const elf_image_t* img,
-                   const elf_ident_info_t* ident,
+                   const elf_ident_t* ident,
                    elf_ehdr_t* out) {
     TRACE("Entered %s", __func__);
 
@@ -255,7 +249,7 @@ static int resolve_extended_section_numbering(const elf_image_t* img,
 
     /* Build a minimal decoder config for elf_read_u*().
      * NOTE: Currently only ei_data is the only field required. */
-    elf_ident_info_t ident;
+    elf_ident_t ident;
     memset(&ident, 0, sizeof(ident));
     ident.ei_class = ehdr->ei_class;
     ident.ei_data = ehdr->ei_data;

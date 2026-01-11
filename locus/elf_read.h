@@ -33,7 +33,7 @@ extern "C" {
  *
  * Reads a 16-bit value at the specified byte offset within the ELF image,
  * decoding it according to the ELF file's endianness as specified in
- * @ref elf_ident_info_t.
+ * @ref elf_ident_t.
  *
  * The returned value is always converted to host byte order.
  *
@@ -46,7 +46,7 @@ extern "C" {
  * @return -EINVAL if parameters are invalid or the read would exceed bounds.
  */
 int elf_read_u16(const elf_image_t* img,
-                 const elf_ident_info_t* ident,
+                 const elf_ident_t* ident,
                  size_t offset,
                  uint16_t* out);
 
@@ -65,7 +65,7 @@ int elf_read_u16(const elf_image_t* img,
  * @return -EINVAL if parameters are invalid or the read would exceed bounds.
  */
 int elf_read_u32(const elf_image_t* img,
-                 const elf_ident_info_t* ident,
+                 const elf_ident_t* ident,
                  size_t offset,
                  uint32_t* out);
 
@@ -84,7 +84,7 @@ int elf_read_u32(const elf_image_t* img,
  * @return -EINVAL if parameters are invalid or the read would exceed bounds.
  */
 int elf_read_u64(const elf_image_t* img,
-                 const elf_ident_info_t* ident,
+                 const elf_ident_t* ident,
                  size_t offset,
                  uint64_t* out);
 

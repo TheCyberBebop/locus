@@ -21,7 +21,7 @@ static void test_elf_validate_ident_invalid_params(void** state) {
     (void)state;  // Unused; no filesystem setup required
 
     elf_image_t img = {0};
-    elf_ident_info_t out = {0};
+    elf_ident_t out = {0};
     assert_int_equal(elf_validate_ident(NULL, &out), -EINVAL);
     assert_int_equal(elf_validate_ident(&img, NULL), -EINVAL);
 }
@@ -36,7 +36,7 @@ static void test_elf_validate_ident_image_base_null(void** state) {
     (void)state;  // Unused; no filesystem setup required
 
     elf_image_t img = {.base = NULL, .size = 64, .path = "base_null_test"};
-    elf_ident_info_t out = {0};
+    elf_ident_t out = {0};
     assert_int_equal(elf_validate_ident(&img, &out), -EINVAL);
 }
 
@@ -71,7 +71,7 @@ static void test_elf_validate_ident_image_size_zero(void** state) {
     size_t saved_size = img.size;
 
     img.size = 0;  // Force inconsistent state
-    elf_ident_info_t out = {0};
+    elf_ident_t out = {0};
     assert_int_equal(elf_validate_ident(&img, &out), -EINVAL);
 
     img.size = saved_size;  // Restore for clean close
@@ -107,7 +107,7 @@ static void test_elf_validate_ident_invalid_magic(void** state) {
     elf_image_t img = {0};
     assert_int_equal(elf_image_open(path, &img), 0);
 
-    elf_ident_info_t ident = {0};
+    elf_ident_t ident = {0};
     assert_int_equal(elf_validate_ident(&img, &ident), -EINVAL);
     assert_int_equal(elf_image_close(&img), 0);
 }
@@ -142,7 +142,7 @@ static void test_elf_validate_ident_invalid_ei_class(void** state) {
     elf_image_t img = {0};
     assert_int_equal(elf_image_open(path, &img), 0);
 
-    elf_ident_info_t ident = {0};
+    elf_ident_t ident = {0};
     assert_int_equal(elf_validate_ident(&img, &ident), -ENOTSUP);
     assert_int_equal(elf_image_close(&img), 0);
 }
@@ -178,7 +178,7 @@ static void test_elf_validate_ident_invalid_ei_data(void** state) {
     elf_image_t img = {0};
     assert_int_equal(elf_image_open(path, &img), 0);
 
-    elf_ident_info_t ident = {0};
+    elf_ident_t ident = {0};
     assert_int_equal(elf_validate_ident(&img, &ident), -ENOTSUP);
     assert_int_equal(elf_image_close(&img), 0);
 }
@@ -214,7 +214,7 @@ static void test_elf_validate_ident_invalid_ei_version(void** state) {
     elf_image_t img = {0};
     assert_int_equal(elf_image_open(path, &img), 0);
 
-    elf_ident_info_t ident = {0};
+    elf_ident_t ident = {0};
     assert_int_equal(elf_validate_ident(&img, &ident), -EINVAL);
     assert_int_equal(elf_image_close(&img), 0);
 }
@@ -253,7 +253,7 @@ static void test_elf_validate_ident_success(void** state) {
     elf_image_t img = {0};
     assert_int_equal(elf_image_open(path, &img), 0);
 
-    elf_ident_info_t ident = {0};
+    elf_ident_t ident = {0};
     assert_int_equal(elf_validate_ident(&img, &ident), 0);
     assert_int_equal(elf_image_close(&img), 0);
 }

@@ -48,6 +48,14 @@
 extern "C" {
 #endif
 
+/* ELF ABI-defined structure sizes (bytes). */
+#define ELF32_EHDR_SIZE 52u
+#define ELF64_EHDR_SIZE 64u
+#define ELF32_PHDR_SIZE 32u
+#define ELF64_PHDR_SIZE 56u
+#define ELF32_SHDR_SIZE 40u
+#define ELF64_SHDR_SIZE 64u
+
 /**
  * @brief Class-neutral, parsed view of the ELF file header.
  *
@@ -109,7 +117,7 @@ typedef struct elf_ehdr {
  * @return 0 on success, negative errno-style value on failure.
  */
 int elf_ehdr_parse(const elf_image_t* img,
-                   const elf_ident_info_t* ident,
+                   const elf_ident_t* ident,
                    elf_ehdr_t* out);
 
 /**

@@ -30,7 +30,7 @@ extern "C" {
 #endif
 
 /**
- * @struct elf_ident_info_t
+ * @struct elf_ident_t
  * @brief Decoder configuration derived from an ELF file's e_ident[] bytes.
  *
  * This structure captures the minimum information needed to interpret an ELF
@@ -41,13 +41,13 @@ extern "C" {
  * these values to select the correct header layouts (ELF32 vs ELF64) and to
  * decode all multi-byte fields according to the file's endianness.
  */
-typedef struct elf_ident_info {
+typedef struct elf_ident {
     uint8_t ei_class;      /**< @c EI_CLASS: ELFCLASS32 or ELFCLASS64. */
     uint8_t ei_data;       /**< @c EI_DATA: ELFDATA2LSB or ELFDATA2MSB. */
     uint8_t ei_version;    /**< @c EI_VERSION: expect EV_CURRENT. */
     uint8_t ei_osabi;      /**< @c EI_OSABI: target OS/ABI identification. */
     uint8_t ei_abiversion; /**< @c EI_ABIVERSION: ABI version for the OSABI. */
-} elf_ident_info_t;
+} elf_ident_t;
 
 /**
  * @brief Convert an ELF EI_CLASS value to a human-readable string.
@@ -60,7 +60,7 @@ typedef struct elf_ident_info {
  * @return A constant, human-readable string describing the ELF class.
  *         Returns a placeholder string for unknown or unsupported values.
  */
-const char *elf_ident_class_str(uint8_t ei_class);
+const char* elf_ident_class_str(uint8_t ei_class);
 
 /**
  * @brief Convert an ELF EI_DATA value to a human-readable string.
@@ -74,7 +74,7 @@ const char *elf_ident_class_str(uint8_t ei_class);
  * @return A constant, human-readable string describing the ELF data encoding.
  *         Returns a placeholder string for unknown or unsupported values.
  */
-const char *elf_ident_data_str(uint8_t ei_data);
+const char* elf_ident_data_str(uint8_t ei_data);
 
 /**
  * @brief Convert an ELF EI_OSABI value to a human-readable string.
@@ -88,7 +88,7 @@ const char *elf_ident_data_str(uint8_t ei_data);
  * @return A constant, human-readable string describing the ELF OS/ABI.
  *         Returns a placeholder string for unknown or reserved values.
  */
-const char *elf_ident_osabi_str(uint8_t ei_osabi);
+const char* elf_ident_osabi_str(uint8_t ei_osabi);
 
 /**
  * @brief Validate the ELF identification bytes (e_ident) and populate decoder
@@ -110,7 +110,7 @@ const char *elf_ident_osabi_str(uint8_t ei_osabi);
  * @return -EINVAL  malformed / not ELF / too small
  * @return -ENOTSUP valid ELF but unsupported class/encoding
  */
-int elf_validate_ident(const elf_image_t* img, elf_ident_info_t* out);
+int elf_validate_ident(const elf_image_t* img, elf_ident_t* out);
 
 #ifdef __cplusplus
 }

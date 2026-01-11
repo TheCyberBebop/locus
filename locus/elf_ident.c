@@ -71,7 +71,7 @@ const char* elf_ident_osabi_str(uint8_t osabi) {
 }
 #endif
 
-int elf_validate_ident(const elf_image_t* img, elf_ident_info_t* out) {
+int elf_validate_ident(const elf_image_t* img, elf_ident_t* out) {
     uint8_t ei_class = 0;
     uint8_t ei_data = 0;
     uint8_t ei_version = 0;

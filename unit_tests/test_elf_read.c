@@ -9,27 +9,27 @@
 #include "test_utilities.h"
 
 typedef int (*read_fn_t)(const elf_image_t* img,
-                         const elf_ident_info_t* ident,
+                         const elf_ident_t* ident,
                          size_t offset,
                          void* out);
 
 /* Wrapper functions so u16/u32/u64 can share one table-driven test. */
 static int elf_read_u16_wrapper(const elf_image_t* img,
-                                const elf_ident_info_t* ident,
+                                const elf_ident_t* ident,
                                 size_t offset,
                                 void* out) {
     return elf_read_u16(img, ident, offset, (uint16_t*)out);
 }
 
 static int elf_read_u32_wrapper(const elf_image_t* img,
-                                const elf_ident_info_t* ident,
+                                const elf_ident_t* ident,
                                 size_t offset,
                                 void* out) {
     return elf_read_u32(img, ident, offset, (uint32_t*)out);
 }
 
 static int elf_read_u64_wrapper(const elf_image_t* img,
-                                const elf_ident_info_t* ident,
+                                const elf_ident_t* ident,
                                 size_t offset,
                                 void* out) {
     return elf_read_u64(img, ident, offset, (uint64_t*)out);
@@ -49,7 +49,7 @@ static void test_elf_read_invalid_params_table(void** state) {
     (void)state;  // Unused; no filesystem setup required
 
     elf_image_t img = {0};
-    elf_ident_info_t ident = {0};
+    elf_ident_t ident = {0};
     uint16_t out16 = 0;
     uint32_t out32 = 0;
     uint64_t out64 = 0;
@@ -87,7 +87,7 @@ static void test_elf_read_u32_image_base_null(void** state) {
         .path = "base_null_test",
     };
 
-    elf_ident_info_t ident = {0};
+    elf_ident_t ident = {0};
     ident.ei_data = ELFDATA2LSB;
 
     uint32_t out = 0;
@@ -112,7 +112,7 @@ static void test_elf_read_u32_invalid_ei_data(void** state) {
         .path = "invalid_ei_data_test",
     };
 
-    elf_ident_info_t ident = {0};
+    elf_ident_t ident = {0};
     ident.ei_data = 0xFFu;  // Unsupported endianness encoding
 
     uint32_t out = 0xDEADBEEFu;
@@ -140,7 +140,7 @@ static void test_elf_read_bounds_edges_table(void** state) {
         .path = "bounds_edges_table",
     };
 
-    elf_ident_info_t ident = {.ei_data = ELFDATA2LSB};
+    elf_ident_t ident = {.ei_data = ELFDATA2LSB};
 
     struct {
         const char* name;
@@ -210,7 +210,7 @@ static void test_elf_read_success_msb_table(void** state) {
         .path = "success_msb_table",
     };
 
-    elf_ident_info_t ident = {.ei_data = ELFDATA2MSB};  // Set to big-endian
+    elf_ident_t ident = {.ei_data = ELFDATA2MSB};  // Set to big-endian
 
     struct {
         const char* name;
@@ -269,7 +269,7 @@ static void test_elf_read_success_lsb_unaligned_table(void** state) {
         .path = "success_lsb_unaligned_table",
     };
 
-    elf_ident_info_t ident = {.ei_data = ELFDATA2LSB};  // Set to little-endian
+    elf_ident_t ident = {.ei_data = ELFDATA2LSB};  // Set to little-endian
 
     struct {
         const char* name;
@@ -330,7 +330,7 @@ static void test_elf_read_u32_offset_overflow(void** state) {
         .path = "offset_overflow",
     };
 
-    elf_ident_info_t ident = {.ei_data = ELFDATA2LSB};  // Set to little-endian
+    elf_ident_t ident = {.ei_data = ELFDATA2LSB};  // Set to little-endian
 
     // Seed out to confirm failure doesn't clobber it
     uint32_t out = 0xDEADBEEFu;
