@@ -29,7 +29,7 @@ int main(int argc, char* argv[]) {
     /* Open and memory-map the ELF file into a read-only image, which will
      * be used for subsequent validation and parsing */
     rc = elf_image_open(argv[1], &img);
-    if (rc < 0) {
+    if (0 != rc) {
         ERROR("failed to open ELF image (%d)", rc);
         goto cleanup;
     }
@@ -38,15 +38,14 @@ int main(int argc, char* argv[]) {
      * decoder configuration, which determines how all subsequent ELF
      * headers and segments must be interpreted (class and endianness) */
     rc = elf_validate_ident(&img, &ident);
-    if (rc < 0) {
+    if (0 != rc) {
         ERROR("ELF identification validation failed (%d)", rc);
         goto cleanup;
     }
 
-    /* Parse the remaining ELF header fields and populate the parsed ELF header
-     */
+    /* Parse remaining ELF header fields and populate the parsed ELF header. */
     rc = elf_ehdr_parse(&img, &ident, &ehdr);
-    if (rc < 0) {
+    if (0 != rc) {
         ERROR("ELF header parsing failed (%d)", rc);
         goto cleanup;
     }

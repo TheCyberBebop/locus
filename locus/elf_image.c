@@ -26,15 +26,17 @@ int elf_image_open(const char* path, elf_image_t* img) {
         return -EINVAL;
     }
 
-    // Open path read-only; O_CLOEXEC prevents file descriptor leaks across exec
-    fd = open(path, O_RDONLY | O_CLOEXEC);
+    // Open path read-only
+    // O_CLOEXEC prevents file descriptor leaks across exec
+    // O_NOFOLLOW prevents following symlinks
+    fd = open(path, O_RDONLY | O_CLOEXEC | O_NOFOLLOW);
     if (-1 == fd) {
         ERROR("open('%s') failed: %s (%d)", path, strerror(errno), errno);
         return -errno;
     }
 
-    // Retrieve file metadata (size, type, permissions, etc.)
-    if (fstat(fd, &st) < 0) {
+    // Retrieve file metadata (stat struct -- size, type, permissions, etc.)
+    if (0 != fstat(fd, &st)) {
         ERROR("fstat('%s') failed: %s (%d)", path, strerror(errno), errno);
         saved = errno;
         close(fd);
@@ -42,14 +44,13 @@ int elf_image_open(const char* path, elf_image_t* img) {
     }
 
     // Verify path is a regular file (i.e., not a directory, etc.)
-    if (!S_ISREG(st.st_mode)) {
+    if (0 == S_ISREG(st.st_mode)) {
         ERROR("'%s' is not a regular file", path);
         close(fd);
         return -EINVAL;
     }
 
-    /* Verify file size: must be large enough to contain at least an ELF32
-     * header */
+    // Verify file size: must contain at least an ELF32header
     if (st.st_size <= 0) {
         ERROR("'%s' has invalid file size (%" PRIdMAX ")", path,
               (intmax_t)st.st_size);
@@ -112,7 +113,7 @@ int elf_image_close(elf_image_t* img) {
             // Can't munmap safely; best effort is to clear fields
             rc = -EINVAL;
         } else {
-            if (munmap((void*)img->base, img->size) < 0) {
+            if (0 != munmap((void*)img->base, img->size)) {
                 int saved = errno;
                 rc = -saved;
                 ERROR("munmap() failed: %s (%d)", strerror(saved), saved);
@@ -120,7 +121,7 @@ int elf_image_close(elf_image_t* img) {
         }
     } else if (0 != img->size) {
         /* Something went wrong, we should never have a size without base. Print
-         * error and clear anyway. */
+         * error and clear fields. */
         ERROR("inconsistent state (base=NULL, size=%zu) for '%s'", img->size,
               path);
         rc = -EINVAL;

@@ -87,7 +87,7 @@ int elf_validate_ident(const elf_image_t* img, elf_ident_t* out) {
 
     // Validate elf_image_t base and size
     if (NULL == img->base) {
-        ERROR("invalid elf_image_t->base");
+        ERROR("invalid elf_image_t->base (%p)", (void*)img->base);
         return -EINVAL;
     }
 
@@ -105,7 +105,7 @@ int elf_validate_ident(const elf_image_t* img, elf_ident_t* out) {
     ident = img->base;
 
     // Verify magic number
-    if (!check_magic(ident)) {
+    if (false == check_magic(ident)) {
         ERROR("'%s': not an ELF file (magic=%02" PRIX8 " %02" PRIX8 " %02" PRIX8
               " %02" PRIX8 ")",
               path, ident[EI_MAG0], ident[EI_MAG1], ident[EI_MAG2],

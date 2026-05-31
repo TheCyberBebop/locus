@@ -71,7 +71,7 @@ int elf_ehdr_parse(const elf_image_t* img,
               ident->ei_class);
         return -ENOTSUP;
     }
-    if (ident->ei_data != ELFDATA2LSB && ident->ei_data != ELFDATA2MSB) {
+    if (ELFDATA2LSB != ident->ei_data && ELFDATA2MSB != ident->ei_data) {
         ERROR("'%s': unsupported ELF ei_data (%" PRIu8 ")", path,
               ident->ei_data);
         return -ENOTSUP;
