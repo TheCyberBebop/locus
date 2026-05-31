@@ -15,6 +15,7 @@ VERY_VERBOSE ?=
 DEBUG        ?=
 LOG          ?= LOG_LEVEL_INFO
 CC           ?= gcc
+CXX          ?= g++
 DOXYGEN      ?= doxygen
 
 # -------- Build config --------
@@ -27,6 +28,7 @@ BUILD_DIR      := $(BUILD_ROOT_DIR)/$(LOG)
 DOCS_DIR       := docs
 DOXYFILE       := Doxyfile
 CC_NATIVE      := $(CC)
+CXX_NATIVE     := $(CXX)
 
 # -------- Build Debug --------
 # Usage:
@@ -96,8 +98,16 @@ CPPFLAGS_COMMON := -Ilocus -DLOG_LEVEL=$(LOG)
 # -MP                      - Add phony targets for headers (safe incremental builds)
 CFLAGS_COMMON   := -O0 -g -Wall -Wextra -Werror -Wpedantic -fno-omit-frame-pointer \
                  -MMD -MP
-# Compile flags for test binaries
+# Compile flags for standalone test binaries
 CFLAGS_TESTS    := -O0 -g -fno-omit-frame-pointer -MMD -MP
+
+# GoogleTest requires C++ compilation
+CXXFLAGS_TESTS  := -O0 -g -Wall -Wextra -Werror \
+                 -fno-omit-frame-pointer -MMD -MP \
+                 -std=c++17
+
+# GoogleTest / GoogleMock libraries.
+GTEST_LIBS      := -lgmock -lgtest_main -lgtest -pthread
 
 # -------- Source files --------
 # LOCUS library sources (everything except the locus entrypoint)
@@ -107,18 +117,26 @@ TEST_SRCS     := $(wildcard $(TEST_FILES_DIR)/*.c)
 # Isolate test file names for building
 TEST_NAMES    := $(notdir $(basename $(TEST_SRCS)))
 
-# -------- Unit tests (cmocka) --------
-UNIT_TEST_SRCS  := $(wildcard $(UNIT_TESTS_DIR)/*.c)
+# -------- Unit tests (GoogleTest, native) --------
+UNIT_TEST_SRCS  := $(wildcard $(UNIT_TESTS_DIR)/*.cc)
 UNIT_TEST_BUILD := $(BUILD_DIR)/$(UNIT_TESTS_DIR)
-UNIT_TEST_BIN   := $(UNIT_TEST_BUILD)/locus_tests
 
-# Object files for unit tests (native only)
-UNIT_OBJS := \
-	$(patsubst $(UNIT_TESTS_DIR)/%.c,$(UNIT_TEST_BUILD)/%.o,$(UNIT_TEST_SRCS))
+# One GoogleTest executable per source file:
+#   unit_tests/test_foo.cc
+# becomes:
+#   build/<log>/unit_tests/test_foo
+UNIT_TEST_BINS := \
+	$(patsubst $(UNIT_TESTS_DIR)/%.cc,$(UNIT_TEST_BUILD)/%,\
+	             $(UNIT_TEST_SRCS))
 
 # LOCUS objects compiled for unit tests (native compile flags)
 UNIT_LOCUS_OBJS := \
 	$(patsubst locus/%.c,$(UNIT_TEST_BUILD)/locus/%.o,$(LOCUS_LIB_SRC))
+
+# Shared C helper code used by GoogleTest suites
+UNIT_HELPER_SRCS := $(UNIT_TESTS_DIR)/test_utilities.c
+UNIT_HELPER_OBJS := \
+	$(patsubst $(UNIT_TESTS_DIR)/%.c,$(UNIT_TEST_BUILD)/%.o,$(UNIT_HELPER_SRCS))
 
 # -------- Toolchains and Architecture Mappings --------
 # Includes host compiler (CC) with no prefix
@@ -289,7 +307,7 @@ $(ARTIFACTS_DIR):
 $(BUILD_ROOT_DIR):
 	$(Q)mkdir -p $@
 
-# -------- Unit tests (native, cmocka) --------
+# -------- GoogleTest unit tests (native) --------
 $(UNIT_TEST_BUILD): | $(BUILD_ROOT_DIR)
 	$(Q)mkdir -p $@
 
@@ -297,19 +315,39 @@ $(UNIT_TEST_BUILD)/locus: | $(UNIT_TEST_BUILD)
 	$(Q)mkdir -p $@
 
 # Compile unit test sources -> build/.../unit_tests/*.o
-$(UNIT_TEST_BUILD)/%.o: $(UNIT_TESTS_DIR)/%.c | $(UNIT_TEST_BUILD)
-	@echo "==> [unit] CC $<"
-	$(Q)$(CC_NATIVE) $(CPPFLAGS_COMMON) $(CFLAGS_COMMON) -I$(UNIT_TESTS_DIR) -c -o $@ $<
+$(UNIT_TEST_BUILD)/%.o: $(UNIT_TESTS_DIR)/%.cc | $(UNIT_TEST_BUILD)
+	@echo "==> [unit] CXX $<"
+	$(Q)$(CXX_NATIVE) \
+		$(CPPFLAGS_COMMON) \
+		$(CXXFLAGS_TESTS) \
+		-I$(UNIT_TESTS_DIR) \
+		-c -o $@ $<
 
 # Compile locus sources for unit tests -> build/.../unit_tests/locus/*.o
 $(UNIT_TEST_BUILD)/locus/%.o: locus/%.c | $(UNIT_TEST_BUILD)/locus
 	@echo "==> [unit] CC $<"
-	$(Q)$(CC_NATIVE) $(CPPFLAGS_COMMON) $(CFLAGS_COMMON) -I$(UNIT_TESTS_DIR) -c -o $@ $<
+	$(Q)$(CC_NATIVE) \
+	$(CPPFLAGS_COMMON) \
+	$(CFLAGS_COMMON) \
+	-I$(UNIT_TESTS_DIR) \
+	-c -o $@ $<
 
-# Link unit test runner (links cmocka)
-$(UNIT_TEST_BIN): $(UNIT_OBJS) $(UNIT_LOCUS_OBJS) | $(UNIT_TEST_BUILD)
-	@echo "==> [unit] LD $@"
-	$(Q)$(CC_NATIVE) -o $@ $^ -lcmocka
+# Compile shared C test helpers
+$(UNIT_TEST_BUILD)/%.o: $(UNIT_TESTS_DIR)/%.c | $(UNIT_TEST_BUILD)
+	@echo "==> [unit] CC $<"
+	$(Q)$(CC_NATIVE) \
+	$(CPPFLAGS_COMMON) \
+	$(CFLAGS_COMMON) \
+	-I$(UNIT_TESTS_DIR) \
+	-c -o $@ $<
+
+# Link a standalone GoogleTest executable
+$(UNIT_TEST_BUILD)/%: \
+	$(UNIT_TEST_BUILD)/%.o \
+	$(UNIT_HELPER_OBJS) \
+	$(UNIT_LOCUS_OBJS) | $(UNIT_TEST_BUILD)
+	@echo "==> [unit] CXXLD $@"
+	$(Q)$(CXX_NATIVE) -o $@ $^ $(GTEST_LIBS)
 
 # -------- Build target expansion --------
 ALL_TESTS           := $(foreach tc,$(TOOLCHAINS_SELECTED), \
@@ -357,11 +395,14 @@ locus_static: check-toolchains $(ALL_LOCUS_STATIC)
 	@echo "Finished building static locus binaries."
 	@echo ""
 
-unit_tests: $(UNIT_TEST_BIN)
+unit_tests: $(UNIT_TEST_BINS)
 	@echo ""
 	@echo "==> Running unit tests"
 	@echo ""
-	$(Q)$(UNIT_TEST_BIN)
+	$(Q)set -e; for test_bin in $(UNIT_TEST_BINS); do \
+		echo "==> Running $$test_bin"; \
+		$$test_bin; \
+	done
 	@echo ""
 	@echo "Finished running unit tests."
 	@echo ""
@@ -395,8 +436,9 @@ docs: $(DOXYFILE)
 
 help:
 	@echo "Usage:"
-	@echo "  make [target] [LOG=LOG_LEVEL_INFO] [ARCH=<arch>] [VERBOSE=1] [VERY_VERBOSE=1] [DEBUG=m|v|b|a]"
-	@echo ""
+	@echo "  make [target] [LOG=LOG_LEVEL_INFO]"
+	@echo "       [ARCH=<arch>] [VERBOSE=1]"
+	@echo "       [VERY_VERBOSE=1] [DEBUG=m|v|b|a]"	@echo ""
 	@echo "Targets: all native native_static tests tests_static locus locus_static unit_tests docs clean"
 	@echo ""
 	@echo "Valid ARCH values:"
