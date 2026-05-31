@@ -28,7 +28,8 @@ RUN apt-get update && \
     unzip \
     less \
     vim \
-    libcmocka-dev \
+    libgtest-dev \
+    libgmock-dev \
     # ==========================
     # Native (host: amd64, little-endian)
     # ==========================
