@@ -4,6 +4,10 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #define TEST_MAX_FILES 64
 
 /* Per-test filesystem state for elf_image unit tests. Using per-test state
@@ -24,5 +28,9 @@ int test_write_file(const char* path, const uint8_t* buf, size_t len);
 /* cmocka setup/teardown for per-test temp directory state. */
 int test_setup_fs(void** state); /* Returns 0 or -errno. */
 int test_teardown_fs(void** state);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif /* LOCUS_TEST_UTILITIES_H */
