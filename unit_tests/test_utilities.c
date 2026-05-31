@@ -5,14 +5,19 @@
 #include <stdlib.h>
 #include <unistd.h>
 
-#include "test_suites.h"
 #include "test_utilities.h"
 
-void register_test_file(test_fs_t* fs, const char* name) {
-    assert_non_null(fs);
-    assert_non_null(name);
-    assert_true(fs->file_count < TEST_MAX_FILES);
+int register_test_file(test_fs_t* fs, const char* name) {
+    if (NULL == fs || NULL == name) {
+        return -EINVAL;
+    }
+
+    if (fs->file_count >= TEST_MAX_FILES) {
+        return -ENOSPC;
+    }
+
     fs->test_files[fs->file_count++] = name;
+    return 0;
 }
 
 int test_write_file(const char* path, const uint8_t* buf, size_t len) {

@@ -16,7 +16,7 @@ typedef struct test_fs {
 } test_fs_t;
 
 /* Validate test_fs_t and add a test file to be removed during teardown */
-void register_test_file(test_fs_t* fs, const char* name);
+int register_test_file(test_fs_t* fs, const char* name);
 
 /* Write an exact buffer to a file (create/truncate). Returns 0 or -errno. */
 int test_write_file(const char* path, const uint8_t* buf, size_t len);
