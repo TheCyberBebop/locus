@@ -5,7 +5,7 @@
 #include <stdlib.h>
 #include <unistd.h>
 
-#include "test_utilities.h"
+#include "gtest_utilities.h"
 
 int register_test_file(test_fs_t* fs, const char* name) {
     if (NULL == fs || NULL == name) {

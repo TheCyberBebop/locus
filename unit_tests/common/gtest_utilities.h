@@ -1,5 +1,5 @@
-#ifndef LOCUS_TEST_UTILITIES_H
-#define LOCUS_TEST_UTILITIES_H
+#ifndef GTEST_UTILITIES_H
+#define GTEST_UTILITIES_H
 
 #include <stddef.h>
 #include <stdint.h>
@@ -33,4 +33,4 @@ int test_teardown_fs(void** state);
 }
 #endif
 
-#endif /* LOCUS_TEST_UTILITIES_H */
+#endif /* GTEST_UTILITIES_H */

@@ -8,8 +8,31 @@
 #include <gtest/gtest.h>
 
 #include "elf_image.h"
-#include "gtest_fixtures.h"
-#include "test_utilities.h"
+#include "gtest_fixtures.hpp"
+#include "gtest_utilities.h"
+
+namespace {
+
+constexpr size_t kPathSize = 512;
+constexpr size_t kTestImageSize = 64;
+
+void ExpectImageCleared(const elf_image_t& img) {
+    EXPECT_EQ(img.base, nullptr);
+    EXPECT_EQ(img.size, 0u);
+    EXPECT_EQ(img.path, nullptr);
+}
+
+void ExpectImageMapped(const elf_image_t& img,
+                       const uint8_t* expected_bytes,
+                       size_t expected_size,
+                       const char* expected_path) {
+    ASSERT_NE(img.base, nullptr);
+    EXPECT_EQ(img.size, expected_size);
+    EXPECT_EQ(img.path, expected_path);
+    EXPECT_EQ(std::memcmp(img.base, expected_bytes, expected_size), 0);
+}
+
+}  // namespace
 
 class ElfImageFsTest : public FilesystemTest {};
 
@@ -25,12 +48,10 @@ class ElfImageFsTest : public FilesystemTest {};
 TEST(ElfImageOpenTest, RejectsInvalidParams) {
     elf_image_t img{};
 
-    EXPECT_EQ(elf_image_open(NULL, &img), -EINVAL);
-    EXPECT_EQ(elf_image_open("/tmp/fake_file", NULL), -EINVAL);
+    EXPECT_EQ(elf_image_open(nullptr, &img), -EINVAL);
+    EXPECT_EQ(elf_image_open("/tmp/fake_file", nullptr), -EINVAL);
 
-    EXPECT_EQ(img.base, nullptr);
-    EXPECT_EQ(img.size, 0u);
-    EXPECT_EQ(img.path, nullptr);
+    ExpectImageCleared(img);
 }
 
 /*
@@ -39,14 +60,12 @@ TEST(ElfImageOpenTest, RejectsInvalidParams) {
  * This test ensures that attempting to open a path that does not exist
  * fails cleanly and does not partially initialize the elf_image_t structure.
  */
-TEST(ElfImageOpenTest, OpenRejectsInvalidPath) {
+TEST(ElfImageOpenTest, RejectsNonexistentPath) {
     elf_image_t img{};
+
     EXPECT_EQ(elf_image_open("/fake/file/path", &img), -ENOENT);
 
-    // Verify fields remained cleared on error
-    EXPECT_EQ(img.base, nullptr);
-    EXPECT_EQ(img.size, 0);
-    EXPECT_EQ(img.path, nullptr);
+    ExpectImageCleared(img);
 }
 
 /*
@@ -61,10 +80,7 @@ TEST_F(ElfImageFsTest, OpenRejectsDirectoryPath) {
 
     EXPECT_EQ(elf_image_open(fs->temp_path, &img), -EINVAL);
 
-    // Verify fields remained cleared on error
-    EXPECT_EQ(img.base, nullptr);
-    EXPECT_EQ(img.size, 0u);
-    EXPECT_EQ(img.path, nullptr);
+    ExpectImageCleared(img);
 }
 
 /*
@@ -76,27 +92,18 @@ TEST_F(ElfImageFsTest, OpenRejectsDirectoryPath) {
  * partially initializing elf_image_t.
  */
 TEST_F(ElfImageFsTest, OpenRejectsFileTooSmall) {
-    const char* test_file = "too_small.bin";
-
-    register_test_file(fs,
-                       test_file);  // Ensure file is removed during teardown
-
-    // Construct a test file path under the temporary directory
-    char path[512];
-    snprintf(path, sizeof(path), "%s/%s", fs->temp_path, test_file);
-
-    // Intentionally smaller than sizeof(Elf32_Ehdr)
-    uint8_t buf[16];
-    memset(buf, 0xFF, sizeof(buf));
-    ASSERT_EQ(test_write_file(path, buf, sizeof(buf)), 0);
-
+    char path[kPathSize]{};
     elf_image_t img{};
+    uint8_t buf[16];  // Intentionally too small to contain an ELF header
+
+    std::memset(buf, 0xFF, sizeof(buf));
+
+    MakePath("too_small.bin", path, sizeof(path));
+
+    ASSERT_EQ(test_write_file(path, buf, sizeof(buf)), 0);
     EXPECT_EQ(elf_image_open(path, &img), -EINVAL);
 
-    // Verify fields remained cleared on error
-    EXPECT_EQ(img.base, nullptr);
-    EXPECT_EQ(img.size, 0u);
-    EXPECT_EQ(img.path, nullptr);
+    ExpectImageCleared(img);
 }
 
 /*
@@ -111,32 +118,21 @@ TEST_F(ElfImageFsTest, OpenRejectsFileTooSmall) {
  *  - successful cleanup via elf_image_close()
  */
 TEST_F(ElfImageFsTest, OpenSuccess) {
-    const char* test_file = "open_success.bin";
-    register_test_file(fs, test_file);
-
-    char path[512];
-    snprintf(path, sizeof(path), "%s/%s", fs->temp_path, test_file);
-
-    uint8_t buf[64];
-    memset(buf, 0xFF, sizeof(buf));
-    ASSERT_EQ(test_write_file(path, buf, sizeof(buf)), 0);
-
+    char path[kPathSize]{};
     elf_image_t img{};
-    ASSERT_EQ(elf_image_open(path, &img), 0);
+    uint8_t buf[kTestImageSize];
 
-    ASSERT_NE(img.base, nullptr);
-    EXPECT_EQ(img.size, sizeof(buf));
-    EXPECT_EQ(img.path, path);
-    EXPECT_EQ(memcmp(img.base, buf, sizeof(buf)), 0);
+    std::memset(buf, 0xFF, sizeof(buf));
+
+    CreateImage("open_success.bin", buf, sizeof(buf), &img, path, sizeof(path));
+    ExpectImageMapped(img, buf, sizeof(buf), path);
 
     EXPECT_EQ(elf_image_close(&img), 0);
-    EXPECT_EQ(img.base, nullptr);
-    EXPECT_EQ(img.size, 0u);
-    EXPECT_EQ(img.path, nullptr);
+    ExpectImageCleared(img);
 }
 
 /* -------------------------------------------------------------------------- */
-/* elf_image_close() tests */
+/* elf_image_close() tests                                                    */
 /* -------------------------------------------------------------------------- */
 
 /*
@@ -149,37 +145,29 @@ TEST(ElfImageCloseTest, RejectsInvalidParams) {
 }
 
 /*
- * Verify that elf_image_close() detects inconsistent state (base != NULL,
+ * Verify that elf_image_close() detects inconsistent state (base != nullptr,
  * size == 0) and still clears the image safely.
  *
  * This test intentionally corrupts elf_image_t after a successful open to
  * validate defensive cleanup behavior.
  */
 TEST_F(ElfImageFsTest, CloseRejectsImageSizeZeroAndClearsImage) {
-    const char* test_file = "size_zero.bin";
-    register_test_file(fs, test_file);
-
-    char path[512]{};
-    snprintf(path, sizeof(path), "%s/%s", fs->temp_path, test_file);
-
-    uint8_t buf[64];
-    memset(buf, 0xFF, sizeof(buf));
-    ASSERT_EQ(test_write_file(path, buf, sizeof(buf)), 0);
-
+    char path[kPathSize]{};
     elf_image_t img{};
-    ASSERT_EQ(elf_image_open(path, &img), 0);
+    uint8_t buf[kTestImageSize];
+
+    std::memset(buf, 0xFF, sizeof(buf));
+
+    CreateImage("size_zero.bin", buf, sizeof(buf), &img, path, sizeof(path));
 
     const uint8_t* saved_base = img.base;
     size_t saved_size = img.size;
-
     img.size = 0;
+
     EXPECT_EQ(elf_image_close(&img), -EINVAL);
 
-    EXPECT_EQ(img.base, nullptr);
-    EXPECT_EQ(img.size, 0u);
-    EXPECT_EQ(img.path, nullptr);
-
-    EXPECT_EQ(munmap((void*)saved_base, saved_size), 0);
+    ExpectImageCleared(img);
+    EXPECT_EQ(munmap(const_cast<uint8_t*>(saved_base), saved_size), 0);
 }
 
 /*
@@ -193,34 +181,28 @@ TEST_F(ElfImageFsTest, CloseRejectsImageSizeZeroAndClearsImage) {
  *  - the image is cleared even on failure (idempotent/safe cleanup behavior)
  */
 TEST_F(ElfImageFsTest, CloseReturnsErrorWhenMunmapFails) {
-    const char* test_file = "munmap_error.bin";
-    register_test_file(fs, test_file);
-
-    char path[512];
-    snprintf(path, sizeof(path), "%s/%s", fs->temp_path, test_file);
-
-    uint8_t buf[64];
-    memset(buf, 0xFF, sizeof(buf));
-    ASSERT_EQ(test_write_file(path, buf, sizeof(buf)), 0);
-
+    char path[kPathSize]{};
     elf_image_t img{};
-    ASSERT_EQ(elf_image_open(path, &img), 0);
+    uint8_t buf[kTestImageSize];
+
+    std::memset(buf, 0xFF, sizeof(buf));
+
+    CreateImage("munmap_error.bin", buf, sizeof(buf), &img, path, sizeof(path));
 
     ASSERT_NE(img.base, nullptr);
     ASSERT_GT(img.size, 0u);
-    ASSERT_EQ(munmap((void*)img.base, img.size), 0);
+    ASSERT_EQ(munmap(const_cast<uint8_t*>(img.base), img.size), 0);
 
-    img.base = reinterpret_cast<const uint8_t*>(0xDEADBEEF);
+    // Force munmap() to fail while preserving a non-zero mapping size
+    img.base = reinterpret_cast<const uint8_t*>(0xDEADBEEFu);
 
     EXPECT_EQ(elf_image_close(&img), -EINVAL);
 
-    EXPECT_EQ(img.base, nullptr);
-    EXPECT_EQ(img.size, 0u);
-    EXPECT_EQ(img.path, nullptr);
+    ExpectImageCleared(img);
 }
 
 /*
- * Verify that elf_image_close() detects inconsistent state (base == NULL,
+ * Verify that elf_image_close() detects inconsistent state (base == nullptr,
  * size != 0) and returns an error while still clearing the image.
  *
  * This test intentionally corrupts an elf_image_t after a successful open to
@@ -229,30 +211,22 @@ TEST_F(ElfImageFsTest, CloseReturnsErrorWhenMunmapFails) {
  * and performs explicit munmap() cleanup.
  */
 TEST_F(ElfImageFsTest, CloseRejectsImageBaseNullAndClearsImage) {
-    const char* test_file = "base_null.bin";
-    register_test_file(fs, test_file);
-
-    char path[512];
-    snprintf(path, sizeof(path), "%s/%s", fs->temp_path, test_file);
-
-    uint8_t buf[64];
-    memset(buf, 0xFF, sizeof(buf));
-    ASSERT_EQ(test_write_file(path, buf, sizeof(buf)), 0);
-
+    char path[kPathSize]{};
     elf_image_t img{};
-    ASSERT_EQ(elf_image_open(path, &img), 0);
+    uint8_t buf[kTestImageSize];
+
+    std::memset(buf, 0xFF, sizeof(buf));
+
+    CreateImage("base_null.bin", buf, sizeof(buf), &img, path, sizeof(path));
 
     const uint8_t* saved_base = img.base;
     size_t saved_size = img.size;
-
+    // Corrupt the image after a successful open to exercise defensive cleanup
     img.base = nullptr;
+
     EXPECT_EQ(elf_image_close(&img), -EINVAL);
-
-    EXPECT_EQ(img.base, nullptr);
-    EXPECT_EQ(img.size, 0u);
-    EXPECT_EQ(img.path, nullptr);
-
-    EXPECT_EQ(munmap((void*)saved_base, saved_size), 0);
+    ExpectImageCleared(img);
+    EXPECT_EQ(munmap(const_cast<uint8_t*>(saved_base), saved_size), 0);
 }
 
 /*
@@ -261,30 +235,20 @@ TEST_F(ElfImageFsTest, CloseRejectsImageBaseNullAndClearsImage) {
  * Closing a successfully-opened image must succeed, clear fields, and remain
  * safe to call again on the same elf_image_t (no double-unmap or reuse bugs).
  */
-
 TEST_F(ElfImageFsTest, CloseAllowsDoubleClose) {
-    const char* test_file = "double_close.bin";
-    register_test_file(fs, test_file);
-
-    char path[512];
-    snprintf(path, sizeof(path), "%s/%s", fs->temp_path, test_file);
-
-    uint8_t buf[64];
-    memset(buf, 0xAA, sizeof(buf));
-    ASSERT_EQ(test_write_file(path, buf, sizeof(buf)), 0);
-
+    char path[kPathSize]{};
     elf_image_t img{};
-    ASSERT_EQ(elf_image_open(path, &img), 0);
+    uint8_t buf[kTestImageSize];
+
+    std::memset(buf, 0xAA, sizeof(buf));
+
+    CreateImage("double_close.bin", buf, sizeof(buf), &img, path, sizeof(path));
 
     EXPECT_EQ(elf_image_close(&img), 0);
-    EXPECT_EQ(img.base, nullptr);
-    EXPECT_EQ(img.size, 0u);
-    EXPECT_EQ(img.path, nullptr);
+    ExpectImageCleared(img);
 
     EXPECT_EQ(elf_image_close(&img), 0);
-    EXPECT_EQ(img.base, nullptr);
-    EXPECT_EQ(img.size, 0u);
-    EXPECT_EQ(img.path, nullptr);
+    ExpectImageCleared(img);
 }
 
 /*
@@ -299,9 +263,7 @@ TEST(ElfImageCloseTest, AllowsEmptyImage) {
 
     EXPECT_EQ(elf_image_close(&img), 0);
 
-    EXPECT_EQ(img.base, nullptr);
-    EXPECT_EQ(img.size, 0u);
-    EXPECT_EQ(img.path, nullptr);
+    ExpectImageCleared(img);
 }
 
 /*
@@ -313,48 +275,28 @@ TEST(ElfImageCloseTest, AllowsEmptyImage) {
  * must fully clear it.
  */
 TEST_F(ElfImageFsTest, OpenCloseReuseSameImage) {
-    const char* test_file1 = "reuse_one.bin";
-    const char* test_file2 = "reuse_two.bin";
-
-    register_test_file(fs, test_file1);
-    register_test_file(fs, test_file2);
-
-    char path1[512];
-    char path2[512];
-    snprintf(path1, sizeof(path1), "%s/%s", fs->temp_path, test_file1);
-    snprintf(path2, sizeof(path2), "%s/%s", fs->temp_path, test_file2);
-
-    uint8_t buf1[64];
-    uint8_t buf2[64];
-    memset(buf1, 0xFF, sizeof(buf1));
-    memset(buf2, 0xAA, sizeof(buf2));
-
-    ASSERT_EQ(test_write_file(path1, buf1, sizeof(buf1)), 0);
-    ASSERT_EQ(test_write_file(path2, buf2, sizeof(buf2)), 0);
-
+    char path1[kPathSize]{};
+    char path2[kPathSize]{};
     elf_image_t img{};
+    uint8_t buf1[kTestImageSize];
+    uint8_t buf2[kTestImageSize];
 
-    ASSERT_EQ(elf_image_open(path1, &img), 0);
-    ASSERT_NE(img.base, nullptr);
-    EXPECT_EQ(img.size, sizeof(buf1));
-    EXPECT_EQ(img.path, path1);
-    EXPECT_EQ(memcmp(img.base, buf1, sizeof(buf1)), 0);
+    std::memset(buf1, 0xFF, sizeof(buf1));
+    std::memset(buf2, 0xAA, sizeof(buf2));
 
-    EXPECT_EQ(elf_image_close(&img), 0);
-    EXPECT_EQ(img.base, nullptr);
-    EXPECT_EQ(img.size, 0u);
-    EXPECT_EQ(img.path, nullptr);
-
-    ASSERT_EQ(elf_image_open(path2, &img), 0);
-    ASSERT_NE(img.base, nullptr);
-    EXPECT_EQ(img.size, sizeof(buf2));
-    EXPECT_EQ(img.path, path2);
-    EXPECT_EQ(memcmp(img.base, buf2, sizeof(buf2)), 0);
+    CreateImage("reuse_one.bin", buf1, sizeof(buf1), &img, path1,
+                sizeof(path1));
+    ExpectImageMapped(img, buf1, sizeof(buf1), path1);
 
     EXPECT_EQ(elf_image_close(&img), 0);
-    EXPECT_EQ(img.base, nullptr);
-    EXPECT_EQ(img.size, 0u);
-    EXPECT_EQ(img.path, nullptr);
+    ExpectImageCleared(img);
+
+    CreateImage("reuse_two.bin", buf2, sizeof(buf2), &img, path2,
+                sizeof(path2));
+    ExpectImageMapped(img, buf2, sizeof(buf2), path2);
+
+    EXPECT_EQ(elf_image_close(&img), 0);
+    ExpectImageCleared(img);
 }
 
 /*
@@ -366,21 +308,15 @@ TEST_F(ElfImageFsTest, OpenCloseReuseSameImage) {
  * safe-to-reuse state.
  */
 TEST_F(ElfImageFsTest, CloseSuccess) {
-    const char* test_file = "close_success.bin";
-    register_test_file(fs, test_file);
-
-    char path[512];
-    snprintf(path, sizeof(path), "%s/%s", fs->temp_path, test_file);
-
-    uint8_t buf[64];
-    memset(buf, 0xFF, sizeof(buf));
-    ASSERT_EQ(test_write_file(path, buf, sizeof(buf)), 0);
-
+    char path[kPathSize]{};
     elf_image_t img{};
-    ASSERT_EQ(elf_image_open(path, &img), 0);
-    EXPECT_EQ(elf_image_close(&img), 0);
+    uint8_t buf[kTestImageSize];
 
-    EXPECT_EQ(img.base, nullptr);
-    EXPECT_EQ(img.size, 0u);
-    EXPECT_EQ(img.path, nullptr);
+    std::memset(buf, 0xFF, sizeof(buf));
+
+    CreateImage("close_success.bin", buf, sizeof(buf), &img, path,
+                sizeof(path));
+
+    EXPECT_EQ(elf_image_close(&img), 0);
+    ExpectImageCleared(img);
 }
