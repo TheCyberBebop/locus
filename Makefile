@@ -136,7 +136,7 @@ UNIT_LOCUS_OBJS := \
 	$(patsubst locus/%.c,$(UNIT_TEST_BUILD)/locus/%.o,$(LOCUS_LIB_SRC))
 
 # Shared C helper code used by GoogleTest suites
-UNIT_HELPER_SRCS := $(UNIT_TEST_COMMON_DIR)/test_utilities.c
+UNIT_HELPER_SRCS := $(UNIT_TEST_COMMON_DIR)/gtest_utilities.c
 UNIT_HELPER_OBJS := \
 	$(patsubst $(UNIT_TEST_COMMON_DIR)/%.c,$(UNIT_TEST_BUILD)/%.o,\
 	             $(UNIT_HELPER_SRCS))
