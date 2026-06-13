@@ -56,6 +56,40 @@ extern "C" {
 #define ELF32_SHDR_SIZE 40u
 #define ELF64_SHDR_SIZE 64u
 
+/* ELF header field offsets (absolute, from file start).
+ *
+ * Intentionally avoids casting the mapped file to Elf{32,64}_Ehdr. Instead,
+ * each field is read at its specified offset using elf_read_u*(), which
+ * enforces bounds checks and correct endianness.
+ */
+enum {
+    /* After e_ident[16] */
+    OFF_E_TYPE = 0x10,
+    OFF_E_MACHINE = 0x12,
+    OFF_E_VERSION = 0x14,
+    OFF_E_ENTRY = 0x18,
+    /* 32-bit */
+    OFF32_E_PHOFF = 0x1C,
+    OFF32_E_SHOFF = 0x20,
+    OFF32_E_FLAGS = 0x24,
+    OFF32_E_EHSIZE = 0x28,
+    OFF32_E_PHENTSIZE = 0x2A,
+    OFF32_E_PHNUM = 0x2C,
+    OFF32_E_SHENTSIZE = 0x2E,
+    OFF32_E_SHNUM = 0x30,
+    OFF32_E_SHSTRNDX = 0x32,
+    /* 64-bit */
+    OFF64_E_PHOFF = 0x20,
+    OFF64_E_SHOFF = 0x28,
+    OFF64_E_FLAGS = 0x30,
+    OFF64_E_EHSIZE = 0x34,
+    OFF64_E_PHENTSIZE = 0x36,
+    OFF64_E_PHNUM = 0x38,
+    OFF64_E_SHENTSIZE = 0x3A,
+    OFF64_E_SHNUM = 0x3C,
+    OFF64_E_SHSTRNDX = 0x3E,
+};
+
 /**
  * @brief Class-neutral, parsed view of the ELF file header.
  *
