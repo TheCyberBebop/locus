@@ -1,6 +1,6 @@
 #include <cerrno>
 #include <cstddef>
-#include <cstdio>
+#include <cstdint>
 #include <cstring>
 
 #include <gtest/gtest.h>
